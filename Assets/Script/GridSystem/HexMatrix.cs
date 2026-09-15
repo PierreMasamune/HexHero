@@ -1,6 +1,4 @@
-using UnityEditor.PackageManager;
 using UnityEngine;
-using UnityEngine.SocialPlatforms.GameCenter;
 
 public class HexMatrix : MonoBehaviour
 {
@@ -55,6 +53,25 @@ public class HexMatrix : MonoBehaviour
             centerPostition.z = (z + x * 0.5f - x / 2) * (InnerRadius(hexSize) * 2f);
         }
         return centerPostition;
+    }
+
+    public static Vector3 OffsetToCube(int x, int z, HexGrid.HexOrientation orientation)
+    {
+        int cubeX;
+        int cubeZ;
+
+        if (orientation == HexGrid.HexOrientation.PointyTop)
+        {
+            cubeX = x - (z - (z & 1)) / 2;
+            cubeZ = z;
+        }
+        else
+        {
+            cubeX = x;
+            cubeZ = z - (x - (x & 1)) / 2;
+        }
+
+        return new Vector3(cubeX, -cubeX - cubeZ, cubeZ);
     }
 
 

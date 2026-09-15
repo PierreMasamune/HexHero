@@ -17,7 +17,6 @@ public class HexGrid : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-      
         for (int z = 0; z < Height; z++)
         {
             for (int x = 0; x < Width; x++)
