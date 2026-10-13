@@ -12,6 +12,7 @@ public class HexGridMeshGenerator : MonoBehaviour
     [field: SerializeField] public HexGrid hexGrid { get; private set; }
     [field: SerializeField] public LayerMask gridlayer { get; private set; }
 
+
     private void Awake()
     {
         if(hexGrid == null)
