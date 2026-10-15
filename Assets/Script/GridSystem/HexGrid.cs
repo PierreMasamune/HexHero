@@ -7,7 +7,6 @@ public class HexGrid : MonoBehaviour
     [field: SerializeField] public int Width { get; private set; }
     [field:SerializeField] public int Height { get; private set; }
     [field:SerializeField] public float HexSize { get; private set; }
-    [field: SerializeField] public GameObject HexPreFab { get; private set; }
     // Start is called once before the first execution of Update after the MonoBehaviour is created
    public enum HexOrientation
     {
