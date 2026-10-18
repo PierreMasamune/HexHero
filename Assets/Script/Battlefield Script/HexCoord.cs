@@ -30,20 +30,22 @@ public struct HexCoord : IEquatable<HexCoord>
         return (Mathf.Abs(dq) + Mathf.Abs(dr) + Mathf.Abs(ds)) / 2;
     }
 
-    // Uses the SAME formula as FlatTopCubeGenerator.CubeToWorldFlatTop.
-    // cx = q, cz = r.
     public Vector3 ToWorld(float size, float y = 0f)
     {
+        // MATCHES FlatTopCubeGenerator.CubeToWorldFlatTop EXACTLY
         float x = size * 1.5f * q;
-        float z = Mathf.Sqrt(3f) * size * (r + q * 0.5f);
+        float z = size * Mathf.Sqrt(3f) * (r + q * 0.5f);
         return new Vector3(x, y, z);
     }
 
     public static HexCoord FromWorld(Vector3 world, float size, Vector3 origin = default)
     {
         Vector3 p = world - origin;
+
+        // Exact inverse of the above
         float qf = p.x / (1.5f * size);
-        float rf = p.z / (Mathf.Sqrt(3f) * size) - qf * 0.5f;
+        float rf = (p.z / (Mathf.Sqrt(3f) * size)) - (qf * 0.5f);
+
         return CubeRound(qf, rf);
     }
 

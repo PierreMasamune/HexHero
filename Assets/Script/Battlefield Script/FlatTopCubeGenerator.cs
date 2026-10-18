@@ -28,6 +28,7 @@ public class FlatTopCubeGenerator : MonoBehaviour
     [SerializeField] private LayerMask gridLayer;
 
     private Mesh generatedMesh;
+    private Vector3 lastPosition;
 
     public int Radius { get => radius; set { radius = Mathf.Max(0, value); Generate(); } }
     public float CellSize { get => cellSize; set { cellSize = Mathf.Max(0.0001f, value); Generate(); } }
@@ -37,6 +38,7 @@ public class FlatTopCubeGenerator : MonoBehaviour
 
     private void OnEnable()
     {
+        lastPosition = transform.position;
         EnsureMeshExists();
         if (generateOnEnable) Generate();
     }
@@ -76,6 +78,15 @@ public class FlatTopCubeGenerator : MonoBehaviour
             generatedMesh = null;
         }
     }
+    private void Update()
+    {
+        // If the object moves, rebuild the mesh instantly
+        if (transform.position != lastPosition)
+        {
+            lastPosition = transform.position;
+            Generate();
+        }
+    }
 
     private void CreateHexRegionMesh(int r, float size, float gapFrac, bool makeWalls, float wallH, LayerMask layerMask)
     {
@@ -104,13 +115,16 @@ public class FlatTopCubeGenerator : MonoBehaviour
         Vector3[] outerCorners = HexMatrix.Corners(size, HexGrid.HexOrientation.FlatTop);
         float innerFactor = Mathf.Clamp01(1f - gapFrac);
         float outerFactor = 1f + gapFrac;
-        float baseY = transform.position.y;
-        float topY = baseY + wallH;
 
         // 1. Top faces (inset hexagons)
         foreach (var c in centersCube)
         {
-            Vector3 center = CubeToWorldFlatTop(c.cx, c.cy, c.cz, size) + transform.position;
+            // --- REMOVED + transform.position FROM HERE ---
+            Vector3 center = CubeToWorldFlatTop(c.cx, c.cy, c.cz, size);
+
+            // We add transform.position.y to the vertex Y so the mesh sits at the correct height
+            center.y = transform.position.y;
+
             int baseIndex = vertices.Count;
             vertices.Add(center);
 
@@ -129,19 +143,21 @@ public class FlatTopCubeGenerator : MonoBehaviour
             }
         }
 
-        // 2. Walls — one per unique edge. Inner face at innerFactor scale,
-        // outer face at (1 + gapFrac) scale (both from this cell's center).
-        // For interior edges, the outer face lands exactly on the neighbor's
-        // inset face, so no overlap and no gap. For boundary edges, the outer
-        // face sticks out (1 + gapFrac) — that's the "honeycomb sticking out" look.
+        // 2. Walls
         if (makeWalls && gapFrac > 0f)
         {
             var processedEdges = new HashSet<(long, long)>();
             const float quantize = 1000f;
 
+            // Calculate world-space Y heights for the walls
+            float baseY = transform.position.y;
+            float topY = baseY + wallH;
+
             foreach (var c in centersCube)
             {
-                Vector3 center = CubeToWorldFlatTop(c.cx, c.cy, c.cz, size) + transform.position;
+                // --- REMOVED + transform.position FROM HERE ---
+                Vector3 center = CubeToWorldFlatTop(c.cx, c.cy, c.cz, size);
+                center.y = baseY;
 
                 for (int s = 0; s < 6; s++)
                 {
