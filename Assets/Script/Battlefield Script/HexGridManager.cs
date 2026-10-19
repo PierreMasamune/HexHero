@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class HexGridManager : MonoBehaviour
@@ -9,11 +8,9 @@ public class HexGridManager : MonoBehaviour
     [SerializeField] private float cellSize = 1f;
 
     [Header("Surface")]
-    [Tooltip("Y coordinate of the top surface where units stand. " +
-             "Set this to your FlatTopCubeGenerator's wallHeight (e.g. 0.5).")]
     [SerializeField] private float surfaceY = 0.5f;
 
-    private readonly Dictionary<HexCoord, HexUnit> occupancy = new();
+    private readonly Dictionary<HexCoord, Unit> occupancy = new();
 
     public int Radius => radius;
     public float CellSize => cellSize;
@@ -38,12 +35,12 @@ public class HexGridManager : MonoBehaviour
     public HexCoord WorldToCell(Vector3 world)
         => HexCoord.FromWorld(world, cellSize, transform.position);
 
-    public HexUnit GetUnit(HexCoord c)
+    public Unit GetUnit(HexCoord c)
         => occupancy.TryGetValue(c, out var u) ? u : null;
 
     public bool IsOccupied(HexCoord c) => occupancy.ContainsKey(c);
 
-    public void SetUnit(HexCoord c, HexUnit unit)
+    public void SetUnit(HexCoord c, Unit unit)
     {
         if (unit == null) occupancy.Remove(c);
         else occupancy[c] = unit;
@@ -60,24 +57,54 @@ public class HexGridManager : MonoBehaviour
         }
     }
 
-    private void Start()
+    public void RegisterUnit(Unit unit, HexCoord cell)
     {
-        // Test 1: center cell (0,0) should be at world origin-ish + surfaceY
-        Debug.Log($"(0,0) -> world {CellToWorld(new HexCoord(0, 0))}");
-
-        // Test 2: cell (1,0) should be ~1.5*cellSize to the +X
-        Debug.Log($"(1,0) -> world {CellToWorld(new HexCoord(1, 0))}");
-
-        // Test 3: round-trip — converting (1,1) to world and back should give (1,1)
-        var c = new HexCoord(1, 1);
-        var w = CellToWorld(c);
-        var back = WorldToCell(w);
-        Debug.Log($"(1,1) -> world {w} -> {back}  (should be (1,1))");
-
-        // Test 4: enumerate all cells in a radius-3 grid
-        int count = 0;
-        foreach (var cell in AllCells()) count++;
-        Debug.Log($"Total cells: {count}  (radius 3 should be 37)");
+        ClearUnit(unit.Cell);
+        SetUnit(cell, unit);
+        unit.SetCell(cell);
+        unit.SnapTo(CellToWorld(cell));
     }
 
+    public List<Unit> GetAllEnemiesOf(Faction faction)
+    {
+        var list = new List<Unit>();
+        foreach (var u in occupancy.Values)
+            if (u != null && u.IsAlive && u.Faction != faction)
+                list.Add(u);
+        return list;
+    }
+
+    // -------- Reachable cells with per-cell cost --------
+    // Budget = unit.RemainingMovement. Cost = 1 per step (extend later for terrain).
+    public Dictionary<HexCoord, int> GetReachableCosts(Unit unit)
+    {
+        var costs = new Dictionary<HexCoord, int>();
+        var visited = new HashSet<HexCoord> { unit.Cell };
+        var queue = new Queue<(HexCoord cell, int cost)>();
+        queue.Enqueue((unit.Cell, 0));
+
+        int budget = unit.RemainingMovement;
+
+        while (queue.Count > 0)
+        {
+            var (cell, cost) = queue.Dequeue();
+            if (cost >= budget) continue;    // can't expand further
+
+            foreach (var next in ValidNeighbors(cell))
+            {
+                if (visited.Contains(next)) continue;
+                if (IsOccupied(next)) continue;
+
+                visited.Add(next);
+                int newCost = cost + 1;
+                costs[next] = newCost;
+                queue.Enqueue((next, newCost));
+            }
+        }
+        return costs;
+    }
+
+    // Wrapper kept for existing callers that only need the set of cells.
+    public HashSet<HexCoord> GetReachableCells(Unit unit)
+        => new HashSet<HexCoord>(GetReachableCosts(unit).Keys);
 }

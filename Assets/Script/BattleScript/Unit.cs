@@ -22,10 +22,10 @@ public class Unit : MonoBehaviour
     [Range(0f, 1f)][SerializeField] private float dodgeChance = 0.05f;
 
     [Header("Range (in hex tiles)")]
-    [SerializeField] private int movementRange = 3;
+    [SerializeField] private int movementRange = 3;   // this is the MAX per turn
     [SerializeField] private int attackRange = 1;
 
-    // ----- Public read-only stats -----
+    // ===== Read-only accessors =====
     public Faction Faction => faction;
     public string UnitName => unitName;
     public int CurrentHP => currentHP;
@@ -38,24 +38,48 @@ public class Unit : MonoBehaviour
     public int MovementRange => movementRange;
     public int AttackRange => attackRange;
 
-    public bool IsAlive => currentHP > 0;
-
-    // ----- Grid + per-turn state -----
-    public Vector3Int Cell { get; set; }
-    public bool HasMoved { get; private set; }
+    // ===== State =====
+    public HexCoord Cell { get; private set; }
+    public int RemainingMovement { get; private set; }
     public bool HasAttacked { get; private set; }
+
+    public bool IsAlive => currentHP > 0;
+    public bool CanMove => IsAlive && RemainingMovement > 0;
     public bool CanStillAct => IsAlive && !HasAttacked;
 
-    public void MarkMoved() => HasMoved = true;
-    public void MarkAttacked() => HasAttacked = true;
-    public void ResetForTurn() { HasMoved = false; HasAttacked = false; }
-
-    // ----- Mutation API (used ONLY by StatsManager) -----
-    public void TakeDamage(int amount)
+    private void Awake()
     {
-        currentHP = Mathf.Max(0, currentHP - amount);
-        if (currentHP == 0) Debug.Log($"{unitName} has been defeated.");
+        // Start the first turn with full movement already primed.
+        RemainingMovement = movementRange;
     }
 
+    // ===== Called by HexGridManager =====
+    public void SetCell(HexCoord c) => Cell = c;
+    public void SnapTo(Vector3 world) => transform.position = world;
+
+    // ===== Turn lifecycle =====
+    public void ResetForTurn()
+    {
+        RemainingMovement = movementRange;
+        HasAttacked = false;
+    }
+
+    // ===== Movement spending =====
+    /// <summary>Deduct movement points after a move.</summary>
+    public void SpendMovement(int cost)
+    {
+        RemainingMovement = Mathf.Max(0, RemainingMovement - cost);
+    }
+
+    // ===== Action flags =====
+    /// <summary>Attack ends this unit's turn AND drains any leftover movement.</summary>
+    public void MarkAttacked()
+    {
+        HasAttacked = true;
+        RemainingMovement = 0;
+    }
+
+    // ===== Stats mutation (called by StatsManager) =====
+    public void TakeDamage(int amount) => currentHP = Mathf.Max(0, currentHP - amount);
     public void Heal(int amount) => currentHP = Mathf.Min(maxHP, currentHP + amount);
 }
