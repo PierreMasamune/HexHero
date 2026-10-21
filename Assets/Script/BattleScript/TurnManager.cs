@@ -1,10 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
-using TMPro;
 
 public enum TurnState { PlayerTurn, EnemyTurn, Victory, Defeat }
 
@@ -56,6 +57,7 @@ public class TurnManager : MonoBehaviour
     {
         if (nextTurnButton != null && nextTurnButton.onClick.GetPersistentEventCount() == 0)
             nextTurnButton.onClick.AddListener(NextTurnButtonPressed);
+        
     }
 
     private void Start()
@@ -73,6 +75,8 @@ public class TurnManager : MonoBehaviour
     {
         if (CurrentState == TurnState.PlayerTurn && !popupOpen)
             RefreshUnitsUI();
+        if (Keyboard.current.spaceKey.isPressed)
+            NextTurnButtonPressed();
     }
 
     // ==================================================================
