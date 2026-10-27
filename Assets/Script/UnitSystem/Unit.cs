@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 
 public enum Faction { Player, Enemy }
@@ -24,6 +25,11 @@ public class Unit : MonoBehaviour
     [Header("Range (in hex tiles)")]
     [SerializeField] private int movementRange = 3;   // this is the MAX per turn
     [SerializeField] private int attackRange = 1;
+
+    [Header("Economic Value")]
+    [SerializeField] private int BuyValue = 10;
+    [SerializeField] private int UpkeepValue = 5;
+    [SerializeField] private int KillValue = 5;
 
     // ===== Read-only accessors =====
     public Faction Faction => faction;
