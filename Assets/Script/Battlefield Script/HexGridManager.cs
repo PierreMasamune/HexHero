@@ -26,7 +26,13 @@ public class HexGridManager : MonoBehaviour
                 yield return new HexCoord(q, r);
         }
     }
+    public static HexGridManager Instance { get; private set; }
 
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+    }
     public bool Contains(HexCoord c) => HexCoord.Distance(HexCoord.Zero, c) <= radius;
 
     public Vector3 CellToWorld(HexCoord c)
