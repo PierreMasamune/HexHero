@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 50f72b1858bfad0499fd74fd9407d1ff, type: 3}
+  m_Name: DefaultShop
+  m_EditorClassIdentifier: Assembly-CSharp::ShopCatalog
+  troopPool:
+  - {fileID: 11400000, guid: ae85769dd53f5054ebd6644cbf75cb5c, type: 2}
+  - {fileID: 11400000, guid: 0761025dc62b4e6438d051ba1eaff756, type: 2}
+  - {fileID: 11400000, guid: ada4a9d10b0b1b9449fb2e60a2be4203, type: 2}
+  itemPool:
+  - {fileID: 11400000, guid: 3338ffd7cf534ee4ca25c4bb3accc74f, type: 2}
+  - {fileID: 11400000, guid: 8af78ad97d47dd741b8dedca8c1080e9, type: 2}
+  - {fileID: 11400000, guid: 868f57c32704c1c47a186039a6699795, type: 2}
+  - {fileID: 11400000, guid: 06c6593d8db93c94a9b84f35f41b4770, type: 2}
+  troopSlots: 3
+  itemSlots: 3

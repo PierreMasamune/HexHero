@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cbda216cbfe47b44dbd2971daf9fc6ac, type: 3}
+  m_Name: Splash Big Potion
+  m_EditorClassIdentifier: Assembly-CSharp::ItemDefinition
+  itemName: Splash Big Potion
+  itemId: big_pot_aoe
+  icon: {fileID: 0}
+  itemPrefab: {fileID: 0}
+  description: healing but what if... BIG
+  rarity: 0
+  baseCost: 50
+  sellValue: 25
+  effectType: 1
+  useContext: 1
+  effectValue: 15
+  effectValue2: 1
+  shopWeight: 100
