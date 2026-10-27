@@ -59,7 +59,11 @@ public class HexGridManager : MonoBehaviour
 
     public void RegisterUnit(Unit unit, HexCoord cell)
     {
-        ClearUnit(unit.Cell);
+        if (unit == null) return;
+
+        if (occupancy.TryGetValue(unit.Cell, out var existing) && existing == unit)
+            occupancy.Remove(unit.Cell);
+
         SetUnit(cell, unit);
         unit.SetCell(cell);
         unit.SnapTo(CellToWorld(cell));

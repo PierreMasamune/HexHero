@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 290454ad8c131c7419e9355e943ea94e, type: 3}
+  m_Name: ElderGoblinMage
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyDefinition
+  enemyName: Elder Goblin Mage
+  enemyType: 10
+  icon: {fileID: 0}
+  unitPrefab: {fileID: 0}
+  description: 
+  rarity: 1
+  tier: 2
+  maxHP: 8
+  defense: 1
+  attack: 10
+  movementRange: 2
+  attackRange: 2
+  critChance: 5
+  dodgeChance: 5
+  splashMode: 1
+  splashRadius: 2
+  splashValue: 3
+  killValue: 20
+  ability: 0
+  abilityValue: 0
+  summonAtBattleStart: 0
+  summonEveryNTurns: 0
+  summonTemplate: {fileID: 0}
+  isBoss: 0
+  shieldPercent: 0

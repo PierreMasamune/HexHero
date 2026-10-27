@@ -1,4 +1,3 @@
-using Unity.VisualScripting;
 using UnityEngine;
 
 public enum Faction { Player, Enemy }
@@ -8,6 +7,8 @@ public class Unit : MonoBehaviour
     [Header("Identity")]
     [SerializeField] private Faction faction = Faction.Player;
     [SerializeField] private string unitName = "Unit";
+    [Tooltip("Set automatically by UnitFactory. Leave empty for manually placed units.")]
+    [SerializeField] private UnitDefinition definition;
 
     [Header("Combat Stats")]
     [SerializeField] private int maxHP = 100;
@@ -23,13 +24,8 @@ public class Unit : MonoBehaviour
     [Range(0f, 1f)][SerializeField] private float dodgeChance = 0.05f;
 
     [Header("Range (in hex tiles)")]
-    [SerializeField] private int movementRange = 3;   // this is the MAX per turn
+    [SerializeField] private int movementRange = 3;
     [SerializeField] private int attackRange = 1;
-
-    [Header("Economic Value")]
-    [SerializeField] private int BuyValue = 10;
-    [SerializeField] private int UpkeepValue = 5;
-    [SerializeField] private int KillValue = 5;
 
     // ===== Read-only accessors =====
     public Faction Faction => faction;
@@ -43,6 +39,7 @@ public class Unit : MonoBehaviour
     public float DodgeChance => dodgeChance;
     public int MovementRange => movementRange;
     public int AttackRange => attackRange;
+    public UnitDefinition Definition => definition;
 
     // ===== State =====
     public HexCoord Cell { get; private set; }
@@ -52,40 +49,86 @@ public class Unit : MonoBehaviour
     public bool IsAlive => currentHP > 0;
     public bool CanMove => IsAlive && RemainingMovement > 0;
     public bool CanStillAct => IsAlive && !HasAttacked;
+    public bool IsKing => definition != null && definition.isKing;
 
     private void Awake()
     {
-        // Start the first turn with full movement already primed.
+        // Set default for manually placed units (Path A).
+        // InitializeFrom will overwrite this if called.
         RemainingMovement = movementRange;
     }
 
-    // ===== Called by HexGridManager =====
+    // ==================================================================
+    //  INITIALIZATION — called by UnitFactory (Path B)
+    // ==================================================================
+
+    /// <summary>Spawn from a UnitDefinition. Overwrites all stats.</summary>
+    public void InitializeFrom(UnitDefinition def, Faction side, int startingHP = -1)
+    {
+        if (def == null) return;
+
+        definition = def;
+        faction = side;
+        unitName = def.unitName;
+
+        maxHP = def.maxHP;
+        currentHP = startingHP >= 0
+                        ? Mathf.Clamp(startingHP, 0, maxHP)
+                        : maxHP;
+
+        attack = def.attack;
+        armor = def.defense;              // naming bridge: armor ↔ defense
+        critChance = def.critChance / 100f;    // 15 → 0.15
+        critDamage = 1.5f;                     // not on UnitDefinition (yet)
+        dodgeChance = def.dodgeChance / 100f;   // 5 → 0.05
+        movementRange = def.movementRange;
+        attackRange = def.attackRange;
+
+        // Reset per-turn state (Awake may already have run)
+        RemainingMovement = movementRange;
+        HasAttacked = false;
+    }
+
+    /// <summary>Spawn from a persistent inventory instance (keeps its current HP).</summary>
+    public void InitializeFrom(UnitInstance instance, Faction side)
+    {
+        if (instance == null || instance.definition == null) return;
+        InitializeFrom(instance.definition, side, instance.currentHP);
+    }
+
+    /// <summary>Write this unit's final HP back into a UnitInstance (called after battle).</summary>
+    public void WriteBackTo(UnitInstance instance)
+    {
+        if (instance == null) return;
+        instance.SyncFromBattle(currentHP);
+    }
+
+    // ==================================================================
+    //  GRID + TURN LIFECYCLE
+    // ==================================================================
+
     public void SetCell(HexCoord c) => Cell = c;
     public void SnapTo(Vector3 world) => transform.position = world;
 
-    // ===== Turn lifecycle =====
     public void ResetForTurn()
     {
         RemainingMovement = movementRange;
         HasAttacked = false;
     }
 
-    // ===== Movement spending =====
-    /// <summary>Deduct movement points after a move.</summary>
     public void SpendMovement(int cost)
-    {
-        RemainingMovement = Mathf.Max(0, RemainingMovement - cost);
-    }
+        => RemainingMovement = Mathf.Max(0, RemainingMovement - cost);
 
-    // ===== Action flags =====
-    /// <summary>Attack ends this unit's turn AND drains any leftover movement.</summary>
     public void MarkAttacked()
     {
         HasAttacked = true;
         RemainingMovement = 0;
     }
 
-    // ===== Stats mutation (called by StatsManager) =====
+    // ==================================================================
+    //  STATS MUTATION (called by StatsManager)
+    // ==================================================================
+
     public void TakeDamage(int amount) => currentHP = Mathf.Max(0, currentHP - amount);
     public void Heal(int amount) => currentHP = Mathf.Min(maxHP, currentHP + amount);
 }
