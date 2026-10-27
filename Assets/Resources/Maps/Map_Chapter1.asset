@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa7c8b46e8ca8454cac33ece1dff5745, type: 3}
+  m_Name: Map_Chapter1
+  m_EditorClassIdentifier: Assembly-CSharp::MapData
+  nodes:
+  - id: Boss_Chapter_1
+    type: 4
+    chapter: 1
+    position: {x: 0, y: 300}
+    children: []
+    label: 
+  - id: Fight 1
+    type: 1
+    chapter: 1
+    position: {x: -200, y: -100}
+    children:
+    - Shop 2
+    - Fight 2
+    label: 
+  - id: Start
+    type: 0
+    chapter: 1
+    position: {x: 0, y: -300}
+    children:
+    - Fight 1
+    - Shop1
+    label: 
+  - id: Shop 2
+    type: 2
+    chapter: 1
+    position: {x: -200, y: 100}
+    children:
+    - Boss_Chapter_1
+    label: 
+  - id: Shop1
+    type: 2
+    chapter: 1
+    position: {x: 200, y: -100}
+    children:
+    - Fight 2
+    label: 
+  - id: Fight 2
+    type: 1
+    chapter: 1
+    position: {x: 200, y: 100}
+    children:
+    - Boss_Chapter_1
+    label: 

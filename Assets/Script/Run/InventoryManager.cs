@@ -58,6 +58,25 @@ public class InventoryManager : MonoBehaviour
         if (units.Remove(instance)) OnUnitsChanged?.Invoke();
     }
 
+    /// <summary>
+    /// Puts a previously-deployed UnitInstance back into the inventory (preserving its HP).
+    /// Returns false if the cap would be exceeded.
+    /// </summary>
+    public bool ReturnUnit(UnitInstance instance)
+    {
+        if (instance == null || instance.definition == null) return false;
+        if (units.Contains(instance)) return true;
+
+        if (!instance.definition.isKing && units.Count >= UnitCap)
+        {
+            Debug.LogWarning($"[Inventory] Cannot return {instance.definition.unitName}: cap ({UnitCap}) reached.");
+            return false;
+        }
+
+        units.Add(instance);
+        OnUnitsChanged?.Invoke();
+        return true;
+    }
     /// <summary>Called after a battle ends. Returns all survivors to inventory (with their final HP).</summary>
     public void MergeSurvivors(IEnumerable<(UnitDefinition def, int hpAfterBattle)> survivors)
     {

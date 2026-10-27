@@ -30,10 +30,13 @@ public class RunState
     [Header("Buffs")]
     public List<string> activeBuffIds = new();  // populated in Slice 3
 
-    [Header("Map")]
-    public string currentNodeId;
-    public List<NodeProgress> visitedNodes = new();
+    [Header("Map Progress")]
+    [Tooltip("ID of the last completed map node. Empty = start of run.")]
+    public string currentMapNodeId = "";
+    public List<string> visitedMapNodeIds = new();
     public int runDepth = 0;
+
+
 
     [Header("Flags")]
     public bool isRunOver = false;

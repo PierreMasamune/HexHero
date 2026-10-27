@@ -131,7 +131,27 @@ public class HexGridManager : MonoBehaviour
                 list.Add(u);
         return list;
     }
+    /// <summary>All cells in the player zone (q &lt;= maxQ) that currently have no living unit.</summary>
+    public List<HexCoord> GetEmptyPlayerZoneCells(int maxQ = 0)
+    {
+        var list = new List<HexCoord>();
+        foreach (var cell in AllCells())
+        {
+            if (cell.q > maxQ) continue;
+            if (GetUnit(cell) != null) continue;
+            list.Add(cell);
+        }
+        return list;
+    }
 
+    /// <summary>All living units of the given faction currently on the board.</summary>
+    public List<Unit> GetAllLivingUnits(Faction faction)
+    {
+        var list = new List<Unit>();
+        foreach (var u in occupancy.Values)
+            if (u != null && u.IsAlive && u.Faction == faction) list.Add(u);
+        return list;
+    }
     /// <summary>
     /// Dijkstra-ish BFS with variable per-cell movement costs (from terrain).
     /// Impassable terrain is skipped. Living units block movement.

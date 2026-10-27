@@ -2,13 +2,14 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // ======================================================================
-//  Data class — one row per unit you want to spawn.
-//  Editable in the Inspector.
+//  One row per unit you want to spawn.
+//  Positions are in HEX coordinates (q, r) — the same space the grid
+//  uses — NOT world coordinates.
 // ======================================================================
 [System.Serializable]
 public class SpawnEntry
 {
-    [Tooltip("Optional label for the Console log. Leave blank to use the definition's name.")]
+    [Tooltip("Optional label for the Console log. Blank = uses the definition's name.")]
     public string label;
 
     [Tooltip("Player or Enemy. Determines which definition field below is used.")]
@@ -20,10 +21,11 @@ public class SpawnEntry
     [Tooltip("Filled when Faction = Enemy.")]
     public EnemyDefinition enemy;
 
-    [Tooltip("World position. Snaps to the nearest hex tile.")]
-    public Vector3 worldPosition = Vector3.zero;
+    [Tooltip("Hex coordinate (q, r). Use the same (q, r) you painted the grid with. " +
+             "Example: (0, 0) is the grid center.")]
+    public HexCoord cell = HexCoord.Zero;
 
-    [Tooltip("Also add this unit to TurnManager's per-faction list so it counts in the turn loop.")]
+    [Tooltip("Also add to TurnManager's per-faction list so it counts in the turn loop.")]
     public bool registerWithTurnManager = true;
 }
 
@@ -35,21 +37,21 @@ public class SpawnTest : MonoBehaviour
     [Header("References")]
     [SerializeField] private HexGridManager grid;
 
-    [Header("Spawn List")]
-    [Tooltip("Add one entry per unit you want to spawn. Each row is a separate unit.")]
+    [Header("Spawn List (hex coords)")]
+    [Tooltip("Add one entry per unit. Position is (q, r) — the hex coordinate space.")]
     [SerializeField] private List<SpawnEntry> spawnList = new();
 
     [Header("Options")]
-    [Tooltip("Run automatically on Start(). Turn off to spawn manually via the component's context menu.")]
+    [Tooltip("Run automatically on Start(). Turn off to spawn manually via the context menu.")]
     [SerializeField] private bool spawnOnStart = true;
 
     [Tooltip("Log every spawned unit's stats to the Console.")]
     [SerializeField] private bool verboseLogging = true;
 
-    [Tooltip("Warn and skip (rather than spawn) if the target cell is already occupied.")]
+    [Tooltip("Warn and skip (rather than overwrite) if the target cell already has a unit.")]
     [SerializeField] private bool skipIfCellOccupied = true;
 
-    // Cache so we don't create a new temp UnitDefinition every spawn.
+    // Cache enemy → UnitDefinition conversions so we only create one temp per session.
     private readonly Dictionary<EnemyDefinition, UnitDefinition> enemyDefCache = new();
 
     // ==================================================================
@@ -59,38 +61,35 @@ public class SpawnTest : MonoBehaviour
     private void Start()
     {
         if (!spawnOnStart) return;
-        if (grid == null) { Debug.LogError("[SpawnTest] 'grid' is not assigned."); return; }
+        if (!ValidateGrid()) return;
         SpawnAll();
     }
 
     // ==================================================================
-    //  PUBLIC — also exposed as Inspector context-menu items
+    //  PUBLIC / CONTEXT MENU
     // ==================================================================
 
-    /// <summary>Spawns every entry in the list, in order.</summary>
     [ContextMenu("Spawn All")]
     public void SpawnAll()
     {
-        if (grid == null) { Debug.LogError("[SpawnTest] Grid not assigned."); return; }
+        if (!ValidateGrid()) return;
+
         if (spawnList == null || spawnList.Count == 0)
         {
             Debug.LogWarning("[SpawnTest] Spawn list is empty.");
             return;
         }
 
-        int successCount = 0;
-        int failCount = 0;
-
+        int success = 0, fail = 0;
         foreach (var entry in spawnList)
         {
-            if (SpawnOne(entry)) successCount++;
-            else failCount++;
+            if (SpawnOne(entry)) success++;
+            else fail++;
         }
 
-        Debug.Log($"[SpawnTest] Done. Spawned {successCount} unit(s); skipped {failCount}.");
+        Debug.Log($"[SpawnTest] Done. Spawned {success} unit(s); skipped {fail}.");
     }
 
-    /// <summary>Clears the inspector spawn list.</summary>
     [ContextMenu("Clear Spawn List")]
     public void ClearList()
     {
@@ -98,7 +97,6 @@ public class SpawnTest : MonoBehaviour
         Debug.Log("[SpawnTest] Spawn list cleared.");
     }
 
-    /// <summary>Logs the current spawn list configuration.</summary>
     [ContextMenu("Log Current List")]
     public void LogList()
     {
@@ -115,7 +113,7 @@ public class SpawnTest : MonoBehaviour
             string def = e.faction == Faction.Player
                 ? (e.troop != null ? e.troop.unitName : "<no troop>")
                 : (e.enemy != null ? e.enemy.enemyName : "<no enemy>");
-            Debug.Log($"  [{i}] '{e.label}' — {e.faction} — {def} @ {e.worldPosition}");
+            Debug.Log($"  [{i}] '{e.label}' — {e.faction} — {def} @ cell ({e.cell.q}, {e.cell.r})");
         }
     }
 
@@ -127,8 +125,8 @@ public class SpawnTest : MonoBehaviour
     {
         if (entry == null) return false;
 
-        // ---- 1. Resolve which definition to use ----
-        UnitDefinition def = null;
+        // ---- 1. Resolve definition ----
+        UnitDefinition def;
         string displayName = string.IsNullOrEmpty(entry.label) ? "?" : entry.label;
 
         if (entry.faction == Faction.Player)
@@ -152,12 +150,12 @@ public class SpawnTest : MonoBehaviour
             displayName = string.IsNullOrEmpty(entry.label) ? entry.enemy.enemyName : entry.label;
         }
 
-        // ---- 2. Compute cell and check occupancy ----
-        var cell = grid.WorldToCell(entry.worldPosition);
+        // ---- 2. Validate the target hex ----
+        HexCoord cell = entry.cell;
 
         if (!grid.Contains(cell))
         {
-            Debug.LogWarning($"[SpawnTest] '{displayName}' — cell {cell} is outside the grid. Skipping.");
+            Debug.LogWarning($"[SpawnTest] '{displayName}' — cell ({cell.q}, {cell.r}) is outside the grid radius. Skipping.");
             return false;
         }
 
@@ -166,32 +164,33 @@ public class SpawnTest : MonoBehaviour
         {
             if (skipIfCellOccupied)
             {
-                Debug.LogWarning($"[SpawnTest] '{displayName}' — cell {cell} already occupied by " +
-                                 $"'{existing.UnitName}'. Skipping (skipIfCellOccupied = true).");
+                Debug.LogWarning($"[SpawnTest] '{displayName}' — cell ({cell.q}, {cell.r}) already occupied by " +
+                                 $"'{existing.UnitName}'. Skipping.");
                 return false;
             }
-            // Fall through — RegisterUnit will replace (the grid fix from before allows this safely)
+            // Fall through — RegisterUnit will replace it (grid fix handles this safely)
         }
 
-        // ---- 3. Spawn ----
-        var unit = UnitFactory.Spawn(def, entry.faction, entry.worldPosition);
+        // ---- 3. Spawn — convert hex to world via the grid ----
+        Vector3 worldPos = grid.CellToWorld(cell);
+        var unit = UnitFactory.Spawn(def, entry.faction, worldPos);
         if (unit == null)
         {
             Debug.LogError($"[SpawnTest] '{displayName}' — UnitFactory.Spawn returned null.");
             return false;
         }
 
-        // ---- 4. Register with grid ----
+        // ---- 4. Register at the exact hex cell ----
         grid.RegisterUnit(unit, cell);
 
         // ---- 5. Register with TurnManager ----
         if (entry.registerWithTurnManager && TurnManager.Instance != null)
             TurnManager.Instance.RegisterSpawnedUnit(unit);
 
-        // ---- 6. Verbose log ----
+        // ---- 6. Log ----
         if (verboseLogging)
         {
-            Debug.Log($"[SpawnTest] {displayName} spawned at cell {cell} — " +
+            Debug.Log($"[SpawnTest] {displayName} spawned at cell ({cell.q}, {cell.r}) — " +
                       $"HP {unit.CurrentHP}/{unit.MaxHP}, ATK {unit.Attack}, ARM {unit.Armor}, " +
                       $"MOVE {unit.MovementRange}, RANGE {unit.AttackRange}, " +
                       $"Crit {unit.CritChance:P0}, Dodge {unit.DodgeChance:P0}, " +
@@ -201,41 +200,53 @@ public class SpawnTest : MonoBehaviour
         return true;
     }
 
+    // ==================================================================
+    //  HELPERS
+    // ==================================================================
+
+    private bool ValidateGrid()
+    {
+        if (grid == null)
+        {
+            Debug.LogError("[SpawnTest] 'Grid' is not assigned. Drag the scene's HexGridManager " +
+                           "into the field. Spawning is disabled.");
+            return false;
+        }
+        return true;
+    }
+
     /// <summary>
     /// Converts an EnemyDefinition to a UnitDefinition for the factory.
-    /// Cached so we only create each temp asset once per session.
-    /// (Slice 4 will add a native UnitFactory.Spawn(EnemyDefinition,...) overload,
-    /// which will make this method obsolete.)
+    /// Cached per-enemy so we only create each temp asset once per session.
     /// </summary>
-  private UnitDefinition EnemyToUnitDef(EnemyDefinition e)
-{
-    if (enemyDefCache.TryGetValue(e, out var cached)) return cached;
+    private UnitDefinition EnemyToUnitDef(EnemyDefinition e)
+    {
+        if (enemyDefCache.TryGetValue(e, out var cached)) return cached;
 
-    var def = ScriptableObject.CreateInstance<UnitDefinition>();
-    def.unitName      = e.enemyName;
-    def.maxHP         = e.maxHP;
-    def.defense       = e.defense;
-    def.attack        = e.attack;
-    def.movementRange = e.movementRange;
-    def.attackRange   = e.attackRange;
-    def.critChance    = e.critChance;
-    def.dodgeChance   = e.dodgeChance;
-    def.recruitCost   = 0;
-    def.upkeepCost    = 0;
-    def.unitPrefab    = e.unitPrefab;
+        var def = ScriptableObject.CreateInstance<UnitDefinition>();
+        def.unitName = e.enemyName;
+        def.maxHP = e.maxHP;
+        def.defense = e.defense;
+        def.attack = e.attack;
+        def.movementRange = e.movementRange;
+        def.attackRange = e.attackRange;
+        def.critChance = e.critChance;
+        def.dodgeChance = e.dodgeChance;
+        def.recruitCost = 0;
+        def.upkeepCost = 0;
+        def.unitPrefab = e.unitPrefab;
 
-    // ★ NEW — copy ability fields so enemy splash/heal/summon work
-    def.splashMode      = e.splashMode;
-    def.splashRadius    = e.splashRadius;
-    def.splashValue     = e.splashValue;
-    def.ability         = e.ability;
-    def.abilityValue    = e.abilityValue;
-    def.summonAtBattleStart = e.summonAtBattleStart;
-    def.summonEveryNTurns   = e.summonEveryNTurns;
-    def.killReward = e.killValue;
-        // summonTemplate not converted here — Slice 4 handles enemy summons
+        def.splashMode = e.splashMode;
+        def.splashRadius = e.splashRadius;
+        def.splashValue = e.splashValue;
+        def.ability = e.ability;
+        def.abilityValue = e.abilityValue;
+        def.summonAtBattleStart = e.summonAtBattleStart;
+        def.summonEveryNTurns = e.summonEveryNTurns;
+
+        def.killReward = e.killValue;
 
         enemyDefCache[e] = def;
-    return def;
-}
+        return def;
+    }
 }
