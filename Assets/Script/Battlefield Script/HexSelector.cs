@@ -23,6 +23,14 @@ public class HexSelector : MonoBehaviour
     [Header("State")]
     public HexCoord HoveredCell;
     public HexCoord SelectedCell;
+    public static HexSelector Instance { get; private set; }
+    private ItemDefinition targetingItem;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+    }
     public bool HasHover { get; private set; }
     public bool HasSelection { get; private set; }
 
@@ -78,10 +86,43 @@ public class HexSelector : MonoBehaviour
         if (!inputEnabled) return;
         if (Mouse.current == null) return;
 
+        if (targetingItem != null)
+        {
+            UpdateHover(); 
+
+            if (Mouse.current.leftButton.wasPressedThisFrame && HasHover)
+            {
+                // Left click: Use the item!
+                ItemManager.Instance.UseItem(targetingItem, targetCell: HoveredCell);
+                CancelItemTargeting(); // <--- THIS clears the targeting mode!
+            }
+            else if (Mouse.current.rightButton.wasPressedThisFrame)
+            {
+                // Right click: Cancel targeting
+                CancelItemTargeting(); // <--- THIS clears the targeting mode!
+            }
+
+            // Return here so the normal unit-selection code below doesn't run
+            return;
+        }
+
+        // 2. NORMAL SELECTION MODE
         UpdateHover();
 
         if (Mouse.current.leftButton.wasPressedThisFrame && HasHover)
             HandleClick(HoveredCell);
+    }
+    public void StartTargetingItem(ItemDefinition item)
+    {
+        Deselect(); // Clear any selected unit
+        targetingItem = item;
+        Debug.Log($"[Selector] Targeting mode ON for {item.itemName}. Left click to use, right click to cancel.");
+    }
+
+    private void CancelItemTargeting()
+    {
+        targetingItem = null;
+        Debug.Log("[Selector] Targeting mode OFF.");
     }
 
     // ==================================================================

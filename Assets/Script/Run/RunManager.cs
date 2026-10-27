@@ -163,4 +163,30 @@ public class RunManager : MonoBehaviour
         if (activeController == null) return;
         activeController.RaiseComplete(result);
     }
+
+    // ==================================================================
+    //  DEBUG TOOLS
+    // ==================================================================
+
+    [ContextMenu("DEBUG: Reset Map Progress Only")]
+    public void DebugResetMapProgress()
+    {
+        // 1. Clear all the nodes you've visited
+        State.visitedMapNodeIds.Clear();
+
+        // 2. Send the player back to the start
+        State.currentMapNodeId = "";
+
+        // 3. Revive the run if you had previously lost
+        State.isRunOver = false;
+
+        // 4. Save the modified state back to the file
+        SaveSystem.Save(State);
+
+        // 5. Hide the Game Over screen and redraw the map
+        if (runOverRoot != null) runOverRoot.SetActive(false);
+        ShowMap();
+
+        Debug.Log("[RunManager] DEBUG: Map progress cleared! Map layout preserved.");
+    }
 }

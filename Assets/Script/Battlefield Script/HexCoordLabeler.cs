@@ -9,8 +9,8 @@ public class HexCoordLabeler : MonoBehaviour
     [SerializeField] private HexGridManager grid;
 
     [Header("Label Settings")]
-    [SerializeField] private float labelHeight = 0.2f;
-    [SerializeField] private float fontSize = 4f;
+    [SerializeField] private float labelHeight = 0f;
+    [SerializeField] private float fontSize = 2f;
     [SerializeField] private Color textColor = Color.black;
     [SerializeField] private Vector3 labelRotation = new Vector3(90f, 0f, 0f);
 

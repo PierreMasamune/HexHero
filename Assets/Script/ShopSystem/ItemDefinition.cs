@@ -33,12 +33,16 @@ public class ItemDefinition : ScriptableObject
     [Header("Effect")]
     public ItemEffectType effectType = ItemEffectType.AoeFireball;
     public ItemUseContext useContext = ItemUseContext.Anywhere;
+    
+
 
     [Header("Effect Parameters")]
-    [Tooltip("Meaning depends on the effect. Fireball: AOE radius. Potion: heal amount.")]
+    [Tooltip("Primary effect value. Fireball: Radius (e.g., 2). Heal: Heal Amount.")]
     public int effectValue = 10;
-    [Tooltip("Secondary effect value. Fireball: ring damage percent (0-100).")]
-    public int effectValue2 = 75;
+    [Tooltip("Secondary effect value. Fireball: Center Damage (e.g., 10). Heal: Radius.")]
+    public int effectValue2 = 10; 
+    [Tooltip("Does this item need a target? (Fireball = true, Potion = true, Unit Cap+ = false)")]
+    public bool requiresTarget = true;
 
     [Header("Stocking")]
     [Tooltip("Relative weight when picking items from the ShopCatalog. Higher = more likely.")]

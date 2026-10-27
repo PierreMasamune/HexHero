@@ -18,33 +18,40 @@ public class HealEffect : ItemEffect
 
         HexCoord center = targetCell.Value;
 
-        // EFFECT VALUE 1: Heal Amount
-        // If it's 0 or less, treat it as a "Full Heal" (9999)
+        // Read from Inspector
         int healAmount = def.effectValue > 0 ? def.effectValue : 9999;
-
-        // EFFECT VALUE 2: Radius
-        // 0 = single target, 1 = 7-hex cluster, 99 = whole map
         int radius = def.effectValue2;
+
+        Debug.Log($"[Heal DEBUG] Detonated at {center}. Searching for Player units within radius {radius} to heal for {healAmount} HP.");
 
         int healedCount = 0;
 
-        // Loop through every tile on the battlefield
         foreach (var cell in grid.AllCells())
         {
             var u = grid.GetUnit(cell);
-            if (u == null || !u.IsAlive) continue;
-            if (u.Faction != Faction.Player) continue; // Only heal players
 
-            int dist = HexCoord.Distance(center, cell);
-
-            if (dist <= radius)
+            // Check what is on the tile
+            if (u != null)
             {
-                u.Heal(healAmount);
-                healedCount++;
+                int dist = HexCoord.Distance(center, cell);
+                Debug.Log($"[Heal DEBUG] Found '{u.UnitName}' (Faction: {u.Faction}) at {cell}. Distance from center: {dist}. HP: {u.CurrentHP}/{u.MaxHP}");
+
+                if (!u.IsAlive) continue;
+                if (u.Faction != Faction.Player) continue;
+
+                if (dist <= radius)
+                {
+                    int beforeHP = u.CurrentHP;
+                    u.Heal(healAmount);
+                    int afterHP = u.CurrentHP;
+
+                    Debug.Log($"[Heal DEBUG] -> Healing {u.UnitName}! HP before: {beforeHP}, HP after: {afterHP}");
+                    healedCount++;
+                }
             }
         }
 
-        Debug.Log($"[Heal] Detonated at {center}. Healed {healedCount} unit(s) for {healAmount} HP each.");
+        Debug.Log($"[Heal] Finished. Healed {healedCount} unit(s).");
         return true;
     }
 }

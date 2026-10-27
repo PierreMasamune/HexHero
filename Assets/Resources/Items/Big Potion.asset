@@ -20,8 +20,9 @@ MonoBehaviour:
   rarity: 0
   baseCost: 50
   sellValue: 25
-  effectType: 2
+  effectType: 1
   useContext: 0
   effectValue: 15
   effectValue2: 0
+  requiresTarget: 1
   shopWeight: 100

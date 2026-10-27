@@ -1,7 +1,7 @@
-using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using TMPro;
+using UnityEngine.InputSystem;
 
 public class ShopUI : MonoBehaviour
 {
@@ -13,11 +13,15 @@ public class ShopUI : MonoBehaviour
     [Header("Containers")]
     [SerializeField] private Transform troopContainer;
     [SerializeField] private Transform itemContainer;
-    [SerializeField] private GameObject shopItemPrefab; // The prefab with ShopItemUI
+    [SerializeField] private GameObject shopItemPrefab;
 
     [Header("Buttons")]
     [SerializeField] private Button closeButton;
     [SerializeField] private Button rerollButton;
+
+    [Header("Battle HUD to Hide")]
+    [Tooltip("Drag your Battle Canvas (or the HUD panel) here so it hides while shopping.")]
+    [SerializeField] private GameObject battleHUD;
 
     private ShopController shop;
     private bool isOpen = false;
@@ -27,14 +31,13 @@ public class ShopUI : MonoBehaviour
         shop = ShopController.Instance;
         if (shop == null) { Debug.LogError("No ShopController found!"); return; }
 
-        // Hook up events
         shop.OnShopUpdated += RefreshUI;
-        EconomyManager.Instance.OnMoneyChanged += HandleMoneyChanged;
+        if (EconomyManager.Instance != null)
+            EconomyManager.Instance.OnMoneyChanged += HandleMoneyChanged;
 
         closeButton.onClick.AddListener(ToggleShop);
         rerollButton.onClick.AddListener(() => shop.Reroll());
 
-        // Start hidden
         shopPanel.SetActive(false);
     }
 
@@ -46,7 +49,6 @@ public class ShopUI : MonoBehaviour
 
     private void Update()
     {
-        // Press F2 to open the shop for testing
         if (Keyboard.current != null && Keyboard.current.f2Key.wasPressedThisFrame)
             ToggleShop();
     }
@@ -56,42 +58,59 @@ public class ShopUI : MonoBehaviour
         isOpen = !isOpen;
         shopPanel.SetActive(isOpen);
 
+        // Hide or show the battle HUD
+        if (battleHUD != null)
+            battleHUD.SetActive(!isOpen);
+
         if (isOpen)
         {
             titleLabel.text = "Merchant";
             RefreshUI();
+
+            // Push the Shop to the front so it renders above everything else
+            shopPanel.transform.SetAsLastSibling();
         }
     }
 
     private void HandleMoneyChanged(int newBalance)
     {
-        moneyLabel.text = $"${newBalance}";
-        if (isOpen) RefreshUI(); // Update button interactability
+        if (moneyLabel != null) moneyLabel.text = $"${newBalance}";
+        if (isOpen) RefreshUI();
     }
 
     private void RefreshUI()
     {
+        if (shop == null || EconomyManager.Instance == null) return;
+
         moneyLabel.text = $"${EconomyManager.Instance.Money}";
 
-        // Clear old cards
-        foreach (Transform child in troopContainer) Destroy(child.gameObject);
-        foreach (Transform child in itemContainer) Destroy(child.gameObject);
+        for (int i = troopContainer.childCount - 1; i >= 0; i--)
+            Destroy(troopContainer.GetChild(i).gameObject);
+        for (int i = itemContainer.childCount - 1; i >= 0; i--)
+            Destroy(itemContainer.GetChild(i).gameObject);
 
-        // Spawn new cards
         foreach (var troop in shop.CurrentTroops)
         {
+            if (troop == null) continue;
             var go = Instantiate(shopItemPrefab, troopContainer);
             var ui = go.GetComponent<ShopItemUI>();
-            ui.SetupTroop(troop, shop);
-            ui.UpdateInteractable(EconomyManager.Instance.Money, shop.IsDiscountActive());
+            if (ui != null)
+            {
+                ui.SetupTroop(troop, shop);
+                ui.UpdateInteractable(EconomyManager.Instance.Money, shop.IsDiscountActive());
+            }
         }
 
         foreach (var item in shop.CurrentItems)
         {
+            if (item == null) continue;
             var go = Instantiate(shopItemPrefab, itemContainer);
             var ui = go.GetComponent<ShopItemUI>();
-            ui.SetupItem(item, shop);
-            ui.UpdateInteractable(EconomyManager.Instance.Money, shop.IsDiscountActive());
+            if (ui != null)
+            {
+                ui.SetupItem(item, shop);
+                ui.UpdateInteractable(EconomyManager.Instance.Money, shop.IsDiscountActive());
+            }
         }
     }
 }

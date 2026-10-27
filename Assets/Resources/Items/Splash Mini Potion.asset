@@ -24,4 +24,5 @@ MonoBehaviour:
   useContext: 1
   effectValue: 5
   effectValue2: 1
+  requiresTarget: 1
   shopWeight: 100

@@ -27,10 +27,12 @@ public class AoeFireballEffect : ItemEffect
         if (grid == null) return false;
 
         HexCoord center = targetCell.Value;
-        int radius = def.effectValue;         // e.g. 2 (this is the "radius" field in the asset)
-        int centerDmg = def.effectValue2;     // e.g. 10 (center damage)
 
-        // Your requirement: 75% on the ring. Hardcoded here but you can promote it to a field later.
+        // Based on our updated ItemDefinition:
+        int radius = def.effectValue;         // e.g. 2 (Radius of the explosion)
+        int centerDmg = def.effectValue2;     // e.g. 10 (Damage in the center)
+
+        // The outer ring takes 75% of the center damage
         int ringDmg = Mathf.Max(1, Mathf.RoundToInt(centerDmg * 0.75f));
 
         // Find every enemy within `radius` of the center

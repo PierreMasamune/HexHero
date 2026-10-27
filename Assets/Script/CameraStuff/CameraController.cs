@@ -1,12 +1,12 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Camera))]
 public class CameraController : MonoBehaviour
 {
     [Header("Play Area Bounds (world units)")]
-    public Vector2 boundsMin = new Vector2(0f, -10f); // X/Z minimum
-    public Vector2 boundsMax = new Vector2(0f, 5f);   // X/Z maximum
+    public Vector2 boundsMin = new Vector2(-10f, -18f); // X/Z minimum
+    public Vector2 boundsMax = new Vector2(10f, 2f);   // X/Z maximum
 
     [Header("Movement")]
     public float dragSensitivity = 1f;
@@ -14,9 +14,9 @@ public class CameraController : MonoBehaviour
     public float smoothTime = 0.08f;
 
     [Header("Zoom")]
-    public float zoomSpeed = 2f;
+    public float zoomSpeed = 30f;
     public float minZoom = 2f;
-    public float maxZoom = 12f;
+    public float maxZoom = 5f;
     public bool zoomTowardsMouse = true;
     public float zoomSmoothTime = 0.08f;
 
@@ -43,8 +43,26 @@ public class CameraController : MonoBehaviour
 
     void Update()
     {
-        HandleDrag();
-        HandleZoom();
+        // We run these checks here so they apply to both
+        if (Mouse.current != null)
+        {
+            Vector2 mousePos = Mouse.current.position.ReadValue();
+
+            // THE FIX: Check if the mouse is inside the Game View window
+            bool isInsideGameWindow = mousePos.x >= 0 && mousePos.x <= Screen.width &&
+                                      mousePos.y >= 0 && mousePos.y <= Screen.height;
+
+            if (isInsideGameWindow)
+            {
+                HandleDrag();
+                HandleZoom();
+            }
+            else
+            {
+                // If mouse leaves the window while dragging, stop dragging
+                isDragging = false;
+            }
+        }
 
         // Smoothly move toward target
         transform.position = Vector3.SmoothDamp(
@@ -86,14 +104,10 @@ public class CameraController : MonoBehaviour
 
         if (!isDragging) return;
 
-        // Calculate how much the mouse moved in screen space
         Vector2 mouseDelta = screenPos - lastMousePos;
         lastMousePos = screenPos;
 
-        // Convert screen pixels to world units based on zoom level
         float worldUnitsPerPixel = (cam.orthographicSize * 2f) / Screen.height;
-
-        // Convert mouse movement to world movement (X and Z)
         Vector3 moveDelta = new Vector3(-mouseDelta.x, 0f, -mouseDelta.y) * worldUnitsPerPixel * dragSensitivity;
 
         if (invertDrag) moveDelta = -moveDelta;
@@ -102,11 +116,9 @@ public class CameraController : MonoBehaviour
         ClampPositionToBounds();
     }
 
-    // This is now only used for zooming toward the mouse
     Vector3 GetWorldPointAtGround(Vector2 screenPos)
     {
         Ray ray = cam.ScreenPointToRay(screenPos);
-        // Ground plane at Y=0 where the table is
         Plane plane = new Plane(Vector3.up, Vector3.zero);
 
         if (plane.Raycast(ray, out float dist))
@@ -137,10 +149,14 @@ public class CameraController : MonoBehaviour
         if (zoomTowardsMouse)
         {
             Vector2 screenPos = mouse.position.ReadValue();
+
+            screenPos.x = Mathf.Clamp(screenPos.x, 0f, Screen.width);
+            screenPos.y = Mathf.Clamp(screenPos.y, 0f, Screen.height);
+
             Vector3 before = GetWorldPointAtGround(screenPos);
 
             targetZoom = Mathf.Clamp(targetZoom - scroll * zoomSpeed, minZoom, maxZoom);
-            cam.orthographicSize = targetZoom; // apply instantly for math
+            cam.orthographicSize = targetZoom;
 
             Vector3 after = GetWorldPointAtGround(screenPos);
 
