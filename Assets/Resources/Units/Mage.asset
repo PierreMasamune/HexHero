@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Mage
   troopType: 12
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 3489057492508999970, guid: 9c45372fa0bd88045bbe4e7eaa597547, type: 3}
   description: 
   tags: 020000000100000004000000
   rarity: 1

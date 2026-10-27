@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Cleric
   troopType: 4
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 1976643945127339912, guid: 8c28fcaefaf14704092bceb0235d2923, type: 3}
   description: 
   tags: 0300000004000000
   rarity: 0

@@ -33,7 +33,7 @@ public class HexSelector : MonoBehaviour
     public event System.Action OnDeselected;
 
     private Unit selectedUnit;
-    private Dictionary<HexCoord, int> cachedMoveCosts;   // cell → cost to reach it
+    private Dictionary<HexCoord, int> cachedMoveCosts;
     private bool inputEnabled = true;
 
     private void Reset()
@@ -107,7 +107,7 @@ public class HexSelector : MonoBehaviour
 
         Unit clicked = grid.GetUnit(cell);
 
-        // ---- No selection → try to select a player unit ----
+        // No selection → try to select a player unit
         if (selectedUnit == null)
         {
             if (clicked != null && clicked.Faction == Faction.Player && clicked.CanStillAct)
@@ -117,14 +117,10 @@ public class HexSelector : MonoBehaviour
             return;
         }
 
-        // ---- Clicking the same unit → toggle off ----
-        if (clicked == selectedUnit)
-        {
-            Deselect();
-            return;
-        }
+        // Clicking the same unit → toggle off
+        if (clicked == selectedUnit) { Deselect(); return; }
 
-        // ---- Clicking another friendly player unit → switch selection ----
+        // Clicking another friendly player unit → switch selection
         if (clicked != null && clicked.Faction == Faction.Player)
         {
             if (clicked.CanStillAct) Select(clicked);
@@ -132,7 +128,7 @@ public class HexSelector : MonoBehaviour
             return;
         }
 
-        // ---- Clicking an enemy → attack if in range ----
+        // Clicking an enemy → attack if in range
         if (clicked != null && clicked.Faction == Faction.Enemy)
         {
             bool inRange = !selectedUnit.HasAttacked
@@ -141,14 +137,14 @@ public class HexSelector : MonoBehaviour
             if (inRange)
             {
                 StatsManager.Instance.ResolveAttack(selectedUnit, clicked);
-                selectedUnit.MarkAttacked();        // sets HasAttacked = true AND zeroes remaining movement
+                selectedUnit.MarkAttacked();
                 OnUnitAttacked?.Invoke(selectedUnit, clicked);
             }
             Deselect();
             return;
         }
 
-        // ---- Clicking an empty cell → move if it's reachable & we have budget ----
+        // Clicking an empty cell → move if it's reachable & we have budget
         if (clicked == null
             && selectedUnit.CanMove
             && cachedMoveCosts != null
@@ -160,20 +156,15 @@ public class HexSelector : MonoBehaviour
             selectedUnit.SetCell(cell);
             grid.SetUnit(cell, selectedUnit);
             selectedUnit.SnapTo(grid.CellToWorld(cell));
-
-            selectedUnit.SpendMovement(moveCost);   // ← deduct ONLY the cost spent
+            selectedUnit.SpendMovement(moveCost);
 
             OnUnitMoved?.Invoke(selectedUnit, from);
 
-            // Recompute highlights from the new cell so a partial move leaves
-            // the remaining blue cells on screen for a second move.
             if (selectedUnit.CanMove) RefreshHighlights();
             else Deselect();
-
             return;
         }
 
-        // ---- Anything else cancels ----
         Deselect();
     }
 
@@ -194,7 +185,7 @@ public class HexSelector : MonoBehaviour
         HasSelection = false;
 
         if (selectionHighlight != null) selectionHighlight.gameObject.SetActive(false);
-        if (highlight != null) highlight.Clear();
+        if (highlight != null) highlight.Clear();       // also clears the outline
         if (had) OnDeselected?.Invoke();
     }
 
@@ -204,6 +195,7 @@ public class HexSelector : MonoBehaviour
 
         SelectedCell = selectedUnit.Cell;
 
+        // ---- Movement fills ----
         cachedMoveCosts = selectedUnit.CanMove
             ? grid.GetReachableCosts(selectedUnit)
             : new Dictionary<HexCoord, int>();
@@ -212,11 +204,44 @@ public class HexSelector : MonoBehaviour
         if (highlight != null)
             highlight.Show(selectedUnit, grid, new List<HexCoord>(cachedMoveCosts.Keys), enemies);
 
+        // ---- Attack range outline ----
+        if (highlight != null)
+        {
+            if (!selectedUnit.HasAttacked && selectedUnit.AttackRange > 0)
+                highlight.ShowAttackOutline(GetCellsInAttackRange(selectedUnit), selectedUnit.Cell);
+            else
+                highlight.ClearAttackOutline();
+        }
+
+        // ---- Selection ring ----
         if (selectionHighlight != null)
         {
             selectionHighlight.gameObject.SetActive(true);
             Vector3 p = grid.CellToWorld(selectedUnit.Cell);
             selectionHighlight.position = new Vector3(p.x, p.y + highlightYOffset, p.z);
         }
+    }
+
+    /// <summary>Every cell within the unit's attack range, excluding its own cell.</summary>
+    private List<HexCoord> GetCellsInAttackRange(Unit unit)
+    {
+        var result = new List<HexCoord>();
+        if (unit == null) return result;
+
+        int r = unit.AttackRange;
+        if (r <= 0) return result;
+
+        for (int dq = -r; dq <= r; dq++)
+        {
+            int rMin = Mathf.Max(-r, -dq - r);
+            int rMax = Mathf.Min(r, -dq + r);
+            for (int dr = rMin; dr <= rMax; dr++)
+            {
+                if (dq == 0 && dr == 0) continue;    // skip unit's own cell
+                var cell = new HexCoord(unit.Cell.q + dq, unit.Cell.r + dr);
+                if (grid.Contains(cell)) result.Add(cell);
+            }
+        }
+        return result;
     }
 }

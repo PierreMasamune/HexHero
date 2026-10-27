@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Knight
   troopType: 10
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 261792096384240468, guid: f343b31aea0f55f40aab77a00a5cd6e5, type: 3}
   description: 
   tags: 000000000d00000004000000
   rarity: 1
