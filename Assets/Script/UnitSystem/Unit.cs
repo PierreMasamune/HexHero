@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public enum Faction { Player, Enemy }
@@ -7,7 +8,6 @@ public class Unit : MonoBehaviour
     [Header("Identity")]
     [SerializeField] private Faction faction = Faction.Player;
     [SerializeField] private string unitName = "Unit";
-    [Tooltip("Set automatically by UnitFactory. Leave empty for manually placed units.")]
     [SerializeField] private UnitDefinition definition;
 
     [Header("Combat Stats")]
@@ -46,23 +46,50 @@ public class Unit : MonoBehaviour
     public int RemainingMovement { get; private set; }
     public bool HasAttacked { get; private set; }
 
+    // Summon tracking
+    public int LastSummonTurn { get; private set; } = -999;
+    public bool HasSummonedAtStart { get; private set; }
+    public bool IsSummoned { get; private set; }
+
+    // ===== Derived state =====
     public bool IsAlive => currentHP > 0;
     public bool CanMove => IsAlive && RemainingMovement > 0;
-    public bool CanStillAct => IsAlive && !HasAttacked;
+
+    /// <summary>
+    /// The unit has an unused action. Cataphracts (DoubleMove) can still act
+    /// after attacking as long as they have movement left.
+    /// </summary>
+    public bool CanStillAct => IsAlive && (
+        !HasAttacked ||
+        (AllowsDoubleMove && RemainingMovement > 0)
+    );
+
     public bool IsKing => definition != null && definition.isKing;
+    public bool AllowsDoubleMove => definition != null && definition.ability == SpecialAbility.DoubleMove;
+
+    /// <summary>
+    /// True if this unit should be cleaned up when the battle ends.
+    /// A unit is transient if it was summoned mid-battle OR its definition
+    /// does not persist between fights (returnsDamaged = false).
+    /// </summary>
+    public bool IsTransient => IsSummoned || (definition != null && !definition.returnsDamaged);
+
+    // ===== Events =====
+    public event Action<Unit> OnDied;
+
+    // ==================================================================
+    //  LIFECYCLE
+    // ==================================================================
 
     private void Awake()
     {
-        // Set default for manually placed units (Path A).
-        // InitializeFrom will overwrite this if called.
         RemainingMovement = movementRange;
     }
 
     // ==================================================================
-    //  INITIALIZATION — called by UnitFactory (Path B)
+    //  INITIALIZATION
     // ==================================================================
 
-    /// <summary>Spawn from a UnitDefinition. Overwrites all stats.</summary>
     public void InitializeFrom(UnitDefinition def, Faction side, int startingHP = -1)
     {
         if (def == null) return;
@@ -77,26 +104,27 @@ public class Unit : MonoBehaviour
                         : maxHP;
 
         attack = def.attack;
-        armor = def.defense;              // naming bridge: armor ↔ defense
-        critChance = def.critChance / 100f;    // 15 → 0.15
-        critDamage = 1.5f;                     // not on UnitDefinition (yet)
-        dodgeChance = def.dodgeChance / 100f;   // 5 → 0.05
+        armor = def.defense;
+        critChance = def.critChance / 100f;
+        critDamage = 1.5f;
+        dodgeChance = def.dodgeChance / 100f;
         movementRange = def.movementRange;
         attackRange = def.attackRange;
 
-        // Reset per-turn state (Awake may already have run)
         RemainingMovement = movementRange;
         HasAttacked = false;
+
+        LastSummonTurn = -999;
+        HasSummonedAtStart = false;
+        IsSummoned = false;
     }
 
-    /// <summary>Spawn from a persistent inventory instance (keeps its current HP).</summary>
     public void InitializeFrom(UnitInstance instance, Faction side)
     {
         if (instance == null || instance.definition == null) return;
         InitializeFrom(instance.definition, side, instance.currentHP);
     }
 
-    /// <summary>Write this unit's final HP back into a UnitInstance (called after battle).</summary>
     public void WriteBackTo(UnitInstance instance)
     {
         if (instance == null) return;
@@ -104,7 +132,7 @@ public class Unit : MonoBehaviour
     }
 
     // ==================================================================
-    //  GRID + TURN LIFECYCLE
+    //  GRID + TURN
     // ==================================================================
 
     public void SetCell(HexCoord c) => Cell = c;
@@ -119,16 +147,47 @@ public class Unit : MonoBehaviour
     public void SpendMovement(int cost)
         => RemainingMovement = Mathf.Max(0, RemainingMovement - cost);
 
+    /// <summary>
+    /// Marks the unit's action as used.
+    /// Normal units forfeit remaining movement; Cataphracts keep it,
+    /// so they can reposition after the attack (Double Move ability).
+    /// </summary>
     public void MarkAttacked()
     {
         HasAttacked = true;
-        RemainingMovement = 0;
+        if (!AllowsDoubleMove)
+            RemainingMovement = 0;
+        // Cataphract: RemainingMovement is untouched — preserved for the post-attack move.
     }
 
     // ==================================================================
-    //  STATS MUTATION (called by StatsManager)
+    //  SUMMON TRACKING
     // ==================================================================
 
-    public void TakeDamage(int amount) => currentHP = Mathf.Max(0, currentHP - amount);
-    public void Heal(int amount) => currentHP = Mathf.Min(maxHP, currentHP + amount);
+    public void MarkSummoned(int turn) => LastSummonTurn = turn;
+
+    public void MarkSummonedAtStart(int turn)
+    {
+        HasSummonedAtStart = true;
+        LastSummonTurn = turn;
+    }
+
+    public void MarkAsSummoned() => IsSummoned = true;
+
+    // ==================================================================
+    //  STATS MUTATION
+    // ==================================================================
+
+    public void TakeDamage(int amount)
+    {
+        if (!IsAlive) return;
+        currentHP = Mathf.Max(0, currentHP - amount);
+        if (currentHP == 0) OnDied?.Invoke(this);
+    }
+
+    public void Heal(int amount)
+    {
+        if (!IsAlive) return;
+        currentHP = Mathf.Min(maxHP, currentHP + amount);
+    }
 }

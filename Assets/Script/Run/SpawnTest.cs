@@ -207,24 +207,35 @@ public class SpawnTest : MonoBehaviour
     /// (Slice 4 will add a native UnitFactory.Spawn(EnemyDefinition,...) overload,
     /// which will make this method obsolete.)
     /// </summary>
-    private UnitDefinition EnemyToUnitDef(EnemyDefinition e)
-    {
-        if (enemyDefCache.TryGetValue(e, out var cached)) return cached;
+  private UnitDefinition EnemyToUnitDef(EnemyDefinition e)
+{
+    if (enemyDefCache.TryGetValue(e, out var cached)) return cached;
 
-        var def = ScriptableObject.CreateInstance<UnitDefinition>();
-        def.unitName = e.enemyName;
-        def.maxHP = e.maxHP;
-        def.defense = e.defense;
-        def.attack = e.attack;
-        def.movementRange = e.movementRange;
-        def.attackRange = e.attackRange;
-        def.critChance = e.critChance;
-        def.dodgeChance = e.dodgeChance;
-        def.recruitCost = 0;
-        def.upkeepCost = 0;
-        def.unitPrefab = e.unitPrefab;
+    var def = ScriptableObject.CreateInstance<UnitDefinition>();
+    def.unitName      = e.enemyName;
+    def.maxHP         = e.maxHP;
+    def.defense       = e.defense;
+    def.attack        = e.attack;
+    def.movementRange = e.movementRange;
+    def.attackRange   = e.attackRange;
+    def.critChance    = e.critChance;
+    def.dodgeChance   = e.dodgeChance;
+    def.recruitCost   = 0;
+    def.upkeepCost    = 0;
+    def.unitPrefab    = e.unitPrefab;
+
+    // ★ NEW — copy ability fields so enemy splash/heal/summon work
+    def.splashMode      = e.splashMode;
+    def.splashRadius    = e.splashRadius;
+    def.splashValue     = e.splashValue;
+    def.ability         = e.ability;
+    def.abilityValue    = e.abilityValue;
+    def.summonAtBattleStart = e.summonAtBattleStart;
+    def.summonEveryNTurns   = e.summonEveryNTurns;
+    def.killReward = e.killValue;
+        // summonTemplate not converted here — Slice 4 handles enemy summons
 
         enemyDefCache[e] = def;
-        return def;
-    }
+    return def;
+}
 }

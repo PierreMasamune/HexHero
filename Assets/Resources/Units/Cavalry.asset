@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Cavalry
   troopType: 15
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 7086723338702861597, guid: 90e14ecc103937544aad64cb52f77125, type: 3}
   description: 
   tags: 000000000e00000004000000
   rarity: 1
@@ -32,7 +32,8 @@ MonoBehaviour:
   splashValue: 0
   upkeepCost: 30
   recruitCost: 209
-  ability: 0
+  killReward: 0
+  ability: 7
   abilityValue: 0
   summonAtBattleStart: 0
   summonEveryNTurns: 0

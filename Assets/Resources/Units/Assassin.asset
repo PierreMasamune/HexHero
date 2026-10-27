@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Assassin
   troopType: 23
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 6997917513844930145, guid: 447d637dee6692d41b36c2938ce11220, type: 3}
   description: 
   tags: 00000000070000000c00000004000000
   rarity: 3

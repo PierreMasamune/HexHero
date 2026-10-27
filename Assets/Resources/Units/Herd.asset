@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Herd
   troopType: 8
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 540588103501618631, guid: 38587d90803b6b249b9efd09904103c9, type: 3}
   description: 
   tags: 060000000100000004000000
   rarity: 0
@@ -34,9 +34,9 @@ MonoBehaviour:
   recruitCost: 60
   ability: 4
   abilityValue: 0
-  summonAtBattleStart: 0
+  summonAtBattleStart: 1
   summonEveryNTurns: 0
-  summonTemplate: {fileID: 0}
+  summonTemplate: {fileID: 11400000, guid: 9b3517dc9c289c34980d02abbbd263e2, type: 2}
   isKing: 0
   countsTowardUnitCap: 1
   returnsDamaged: 1

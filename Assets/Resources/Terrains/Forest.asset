@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 138ece6991581614ea466adeb7f41448, type: 3}
+  m_Name: Forest
+  m_EditorClassIdentifier: Assembly-CSharp::TerrainDefinition
+  terrainName: Forest
+  terrainType: 1
+  icon: {fileID: 0}
+  description: 
+  movementCost: 2
+  damageReductionPercent: 20
+  entryDamage: 0
+  color: {r: 0.15, g: 0.45, b: 0.15, a: 0.45}
+  material: {fileID: 0}

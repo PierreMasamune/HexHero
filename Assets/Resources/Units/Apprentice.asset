@@ -27,7 +27,7 @@ MonoBehaviour:
   attackRange: 2
   critChance: 5
   dodgeChance: 5
-  splashMode: 1
+  splashMode: 2
   splashRadius: 1
   splashValue: 1
   upkeepCost: 10

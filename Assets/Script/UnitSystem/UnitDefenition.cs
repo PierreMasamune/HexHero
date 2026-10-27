@@ -32,6 +32,7 @@ public class UnitDefinition : ScriptableObject
     [Header("Economy")]
     public int upkeepCost = 10;
     public int recruitCost = 50;
+    public int killReward = 0;
 
     [Header("Special Ability")]
     public SpecialAbility ability = SpecialAbility.None;

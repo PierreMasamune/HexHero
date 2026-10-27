@@ -12,7 +12,10 @@ public class TurnManager : MonoBehaviour
 {
     public static TurnManager Instance { get; private set; }
 
-    // ===== Inspector =====
+    // ==================================================================
+    //  INSPECTOR FIELDS
+    // ==================================================================
+
     [Header("Managers")]
     [SerializeField] private HexGridManager grid;
     [SerializeField] private HexSelector selector;
@@ -25,13 +28,16 @@ public class TurnManager : MonoBehaviour
     [SerializeField] private float enemyStartDelay = 0.30f;
     [SerializeField] private float enemyStepDelay = 0.25f;
 
+    [Header("Battle End Cleanup")]
+    [SerializeField] private float transientCleanupDelay = 0.4f;
+
     [Header("End Turn UI")]
     [SerializeField] private Button nextTurnButton;
     [SerializeField] private ConfirmationPopup confirmPopup;
     [SerializeField] private bool promptIfUnitsCanStillMove = true;
     [SerializeField] private bool checkMovementInsteadOfActions = true;
 
-    [Header("HUD")]
+    [Header("HUD (optional — leave blank to use events)")]
     [SerializeField] private TMP_Text turnLabel;
     [SerializeField] private TMP_Text phaseLabel;
     [SerializeField] private TMP_Text unitsLabel;
@@ -41,17 +47,26 @@ public class TurnManager : MonoBehaviour
     [SerializeField] private UnityEvent onDefeat;
     [SerializeField] private bool stopPlayerInputOnGameEnd = true;
 
-    // ===== C# events =====
+    // ==================================================================
+    //  EVENTS
+    // ==================================================================
+
     public event Action<int> OnTurnChanged;
     public event Action<TurnState> OnStateChanged;
     public event Action<int, int> OnUnitCountChanged;
 
-    // ===== Public state =====
+    // ==================================================================
+    //  PUBLIC STATE
+    // ==================================================================
+
     public int TurnNumber { get; private set; }
     public TurnState CurrentState { get; private set; }
     public bool IsPlayerTurn => CurrentState == TurnState.PlayerTurn;
 
-    // ===== Internal =====
+    // ==================================================================
+    //  INTERNAL
+    // ==================================================================
+
     private bool nextTurnRequested;
     private bool popupOpen;
     private int lastCanAct = -1;
@@ -74,7 +89,6 @@ public class TurnManager : MonoBehaviour
     {
         if (grid == null) Debug.LogError("[TurnManager] 'grid' is not assigned!");
 
-        // Register any units manually placed in the scene with the grid.
         foreach (var u in playerUnits)
             if (u != null && grid != null)
                 grid.RegisterUnit(u, grid.WorldToCell(u.transform.position));
@@ -82,46 +96,40 @@ public class TurnManager : MonoBehaviour
             if (u != null && grid != null)
                 grid.RegisterUnit(u, grid.WorldToCell(u.transform.position));
 
-        // Pick up any units that were spawned by other scripts before we started.
-        SyncUnitListsWithGrid();
+        if (grid != null) grid.OnUnitDied += HandleUnitDied;
 
+        SyncUnitListsWithGrid();
         SetNextTurnButtonInteractable(false);
         StartCoroutine(GameLoop());
+    }
+
+    private void OnDestroy()
+    {
+        if (grid != null) grid.OnUnitDied -= HandleUnitDied;
+        if (Instance == this) Instance = null;
     }
 
     private void Update()
     {
         if (CurrentState == TurnState.PlayerTurn && !popupOpen)
         {
-            // Catch units spawned mid-turn (SpawnTest, summons, etc.)
             SyncUnitListsWithGrid();
             RefreshUnitsUI();
         }
     }
 
     // ==================================================================
-    //  UNIT REGISTRY — makes spawning "just work"
+    //  UNIT REGISTRY
     // ==================================================================
 
-    /// <summary>Add a runtime-spawned unit to the correct list. Called by SpawnTest / FightNodeController.</summary>
     public void RegisterSpawnedUnit(Unit unit)
     {
         if (unit == null) return;
-
-        if (unit.Faction == Faction.Player)
-        {
-            if (!playerUnits.Contains(unit)) playerUnits.Add(unit);
-        }
-        else
-        {
-            if (!enemyUnits.Contains(unit)) enemyUnits.Add(unit);
-        }
-
+        if (unit.Faction == Faction.Player) { if (!playerUnits.Contains(unit)) playerUnits.Add(unit); }
+        else { if (!enemyUnits.Contains(unit)) enemyUnits.Add(unit); }
         RefreshUnitsUI();
     }
 
-    /// <summary>Scan the grid and add any units that aren't in our lists yet.
-    /// Also purges destroyed (Unity-null) entries.</summary>
     public void SyncUnitListsWithGrid()
     {
         if (grid == null) return;
@@ -134,15 +142,17 @@ public class TurnManager : MonoBehaviour
             var u = grid.GetUnit(cell);
             if (u == null || !u.IsAlive) continue;
 
-            if (u.Faction == Faction.Player)
-            {
-                if (!playerUnits.Contains(u)) playerUnits.Add(u);
-            }
-            else
-            {
-                if (!enemyUnits.Contains(u)) enemyUnits.Add(u);
-            }
+            if (u.Faction == Faction.Player) { if (!playerUnits.Contains(u)) playerUnits.Add(u); }
+            else { if (!enemyUnits.Contains(u)) enemyUnits.Add(u); }
         }
+    }
+
+    private void HandleUnitDied(Unit unit)
+    {
+        if (unit == null) return;
+        playerUnits.Remove(unit);
+        enemyUnits.Remove(unit);
+        RefreshUnitsUI();
     }
 
     // ==================================================================
@@ -155,7 +165,6 @@ public class TurnManager : MonoBehaviour
         if (nextTurnRequested || popupOpen) return;
 
         int pending = CountStillActionablePlayers();
-
         if (promptIfUnitsCanStillMove && pending > 0 && confirmPopup != null)
         {
             popupOpen = true;
@@ -163,13 +172,9 @@ public class TurnManager : MonoBehaviour
             string msg = pending == 1
                 ? $"1 unit can still {verb}. End turn anyway?"
                 : $"{pending} units can still {verb}. End turn anyway?";
-
             confirmPopup.Show(msg, ConfirmEndTurn, CancelEndTurn);
         }
-        else
-        {
-            ConfirmEndTurn();
-        }
+        else ConfirmEndTurn();
     }
 
     public void ConfirmEndTurn() { popupOpen = false; nextTurnRequested = true; }
@@ -185,10 +190,14 @@ public class TurnManager : MonoBehaviour
 
         while (true)
         {
-            // ---- PLAYER TURN ----
+            // ============ PLAYER TURN ============
             SyncUnitListsWithGrid();
             foreach (var u in playerUnits)
                 if (u != null && u.IsAlive) u.ResetForTurn();
+
+            ApplyStartOfTurnPassives(playerUnits);
+            SummonManager.ApplyStartOfTurnSummons(playerUnits, TurnNumber, grid);
+
             SetState(TurnState.PlayerTurn);
 
             selector.EnableInput(true);
@@ -202,10 +211,14 @@ public class TurnManager : MonoBehaviour
 
             if (CheckBattleEnd()) yield break;
 
-            // ---- ENEMY TURN ----
+            // ============ ENEMY TURN ============
             SyncUnitListsWithGrid();
             foreach (var u in enemyUnits)
                 if (u != null && u.IsAlive) u.ResetForTurn();
+
+            ApplyStartOfTurnPassives(enemyUnits);
+            SummonManager.ApplyStartOfTurnSummons(enemyUnits, TurnNumber, grid);
+
             SetState(TurnState.EnemyTurn);
 
             yield return StartCoroutine(EnemyTurnRoutine());
@@ -216,14 +229,38 @@ public class TurnManager : MonoBehaviour
     }
 
     // ==================================================================
+    //  START-OF-TURN PASSIVES (Self Heal)
+    // ==================================================================
+
+    private void ApplyStartOfTurnPassives(List<Unit> units)
+    {
+        if (units == null) return;
+
+        foreach (var u in units)
+        {
+            if (u == null || !u.IsAlive) continue;
+            if (u.Definition == null) continue;
+
+            if (u.Definition.ability == SpecialAbility.SelfHeal)
+            {
+                int healAmount = Mathf.Max(1, u.Attack / 2);
+                int before = u.CurrentHP;
+                u.Heal(healAmount);
+                int healed = u.CurrentHP - before;
+                if (healed > 0)
+                    Debug.Log($"[Passive] {u.UnitName} self-healed +{healed} HP " +
+                              $"({u.CurrentHP}/{u.MaxHP})");
+            }
+        }
+    }
+
+    // ==================================================================
     //  ENEMY AI
     // ==================================================================
 
     private IEnumerator EnemyTurnRoutine()
     {
         yield return new WaitForSeconds(enemyStartDelay);
-
-        // Snapshot so summons during this phase don't extend the loop
         var snapshot = new List<Unit>(enemyUnits);
 
         foreach (var enemy in snapshot)
@@ -233,6 +270,7 @@ public class TurnManager : MonoBehaviour
             Unit target = FindClosestPlayer(enemy);
             if (target == null) yield break;
 
+            // ---- Move toward target if out of attack range ----
             if (!CanAttack(enemy, target) && enemy.CanMove)
             {
                 var costs = grid.GetReachableCosts(enemy);
@@ -253,10 +291,28 @@ public class TurnManager : MonoBehaviour
                     grid.SetUnit(bestCell, enemy);
                     enemy.SnapTo(grid.CellToWorld(bestCell));
                     enemy.SpendMovement(bestCost);
+
+                    // Terrain entry damage (vine)
+                    if (grid.TerrainMap != null)
+                    {
+                        int dmg = grid.TerrainMap.GetEntryDamage(bestCell);
+                        if (dmg > 0)
+                        {
+                            enemy.TakeDamage(dmg);
+                            var terr = grid.TerrainMap.GetTerrain(bestCell);
+                            string tname = terr != null ? terr.terrainName : "terrain";
+                            Debug.Log($"[Terrain] {enemy.UnitName} took {dmg} dmg entering {tname}. " +
+                                      $"({enemy.CurrentHP}/{enemy.MaxHP})");
+                        }
+                    }
+
                     yield return new WaitForSeconds(enemyStepDelay);
+
+                    if (!enemy.IsAlive) continue;   // died to terrain, skip attack
                 }
             }
 
+            // ---- Attack if now in range ----
             if (!enemy.HasAttacked && CanAttack(enemy, target))
             {
                 StatsManager.Instance.ResolveAttack(enemy, target);
@@ -294,11 +350,36 @@ public class TurnManager : MonoBehaviour
     {
         SyncUnitListsWithGrid();
 
-        bool playersDead = playerUnits.TrueForAll(u => u == null || !u.IsAlive);
-        bool enemiesDead = enemyUnits.TrueForAll(u => u == null || !u.IsAlive);
+        bool anyPersistentPlayerAlive = false;
+        foreach (var u in playerUnits)
+        {
+            if (u == null || !u.IsAlive) continue;
+            if (u.IsTransient) continue;
+            anyPersistentPlayerAlive = true;
+            break;
+        }
 
-        if (playersDead) { EndGame(TurnState.Defeat); Debug.Log("=== DEFEAT ==="); return true; }
-        if (enemiesDead) { EndGame(TurnState.Victory); Debug.Log("=== VICTORY ==="); return true; }
+        bool anyPersistentEnemyAlive = false;
+        foreach (var u in enemyUnits)
+        {
+            if (u == null || !u.IsAlive) continue;
+            if (u.IsTransient) continue;
+            anyPersistentEnemyAlive = true;
+            break;
+        }
+
+        if (!anyPersistentPlayerAlive)
+        {
+            EndGame(TurnState.Defeat);
+            Debug.Log("=== DEFEAT ===");
+            return true;
+        }
+        if (!anyPersistentEnemyAlive)
+        {
+            EndGame(TurnState.Victory);
+            Debug.Log("=== VICTORY ===");
+            return true;
+        }
         return false;
     }
 
@@ -310,8 +391,48 @@ public class TurnManager : MonoBehaviour
         if (stopPlayerInputOnGameEnd && selector != null)
             selector.EnableInput(false);
 
-        if (endState == TurnState.Victory) onVictory?.Invoke();
-        else if (endState == TurnState.Defeat) onDefeat?.Invoke();
+        if (endState == TurnState.Victory)
+        {
+            if (EconomyManager.Instance != null)
+                EconomyManager.Instance.AwardBattleEndGold(playerUnits);
+
+            onVictory?.Invoke();
+        }
+        else if (endState == TurnState.Defeat)
+        {
+            onDefeat?.Invoke();
+        }
+
+        StartCoroutine(CleanupTransientUnitsRoutine());
+    }
+
+    private IEnumerator CleanupTransientUnitsRoutine()
+    {
+        if (transientCleanupDelay > 0f)
+            yield return new WaitForSeconds(transientCleanupDelay);
+
+        var toDestroy = new List<Unit>();
+
+        foreach (var u in playerUnits)
+            if (u != null && u.IsTransient) toDestroy.Add(u);
+
+        foreach (var u in enemyUnits)
+            if (u != null && u.IsTransient) toDestroy.Add(u);
+
+        if (toDestroy.Count == 0) yield break;
+
+        Debug.Log($"[Cleanup] Destroying {toDestroy.Count} transient unit(s) at battle end.");
+
+        foreach (var u in toDestroy)
+        {
+            if (u == null) continue;
+            if (grid != null) grid.ClearUnit(u.Cell);
+            playerUnits.Remove(u);
+            enemyUnits.Remove(u);
+            if (u.gameObject != null) Destroy(u.gameObject);
+        }
+
+        RefreshUnitsUI();
     }
 
     // ==================================================================

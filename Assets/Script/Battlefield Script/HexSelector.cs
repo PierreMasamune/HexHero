@@ -30,11 +30,18 @@ public class HexSelector : MonoBehaviour
     public event System.Action<Unit> OnUnitSelected;
     public event System.Action<Unit, HexCoord> OnUnitMoved;
     public event System.Action<Unit, Unit> OnUnitAttacked;
+    public event System.Action<Unit, Unit> OnUnitHealed;
     public event System.Action OnDeselected;
 
     private Unit selectedUnit;
     private Dictionary<HexCoord, int> cachedMoveCosts;
     private bool inputEnabled = true;
+
+    private HexCoord lastPreviewedCell = new HexCoord(int.MinValue, int.MinValue);
+
+    // ==================================================================
+    //  LIFECYCLE
+    // ==================================================================
 
     private void Reset()
     {
@@ -49,8 +56,15 @@ public class HexSelector : MonoBehaviour
         if (grid == null) grid = FindAnyObjectByType<HexGridManager>();
         if (highlight == null) highlight = FindAnyObjectByType<HexHighlightManager>();
 
+        if (grid != null) grid.OnUnitDied += HandleUnitDied;
+
         if (hoverHighlight != null) hoverHighlight.gameObject.SetActive(false);
         if (selectionHighlight != null) selectionHighlight.gameObject.SetActive(false);
+    }
+
+    private void OnDestroy()
+    {
+        if (grid != null) grid.OnUnitDied -= HandleUnitDied;
     }
 
     public void EnableInput(bool enable)
@@ -69,6 +83,10 @@ public class HexSelector : MonoBehaviour
         if (Mouse.current.leftButton.wasPressedThisFrame && HasHover)
             HandleClick(HoveredCell);
     }
+
+    // ==================================================================
+    //  HOVER
+    // ==================================================================
 
     private void UpdateHover()
     {
@@ -93,13 +111,80 @@ public class HexSelector : MonoBehaviour
                     Vector3 p = grid.CellToWorld(cell);
                     hoverHighlight.position = new Vector3(p.x, p.y + highlightYOffset, p.z);
                 }
+
+                UpdatePreviews(cell);
                 return;
             }
         }
 
         HasHover = false;
         if (hoverHighlight != null) hoverHighlight.gameObject.SetActive(false);
+        if (highlight != null) { highlight.ClearAoePreview(); highlight.ClearHealPreview(); }
+        lastPreviewedCell = new HexCoord(int.MinValue, int.MinValue);
     }
+
+    private void UpdatePreviews(HexCoord hoveredCell)
+    {
+        if (highlight == null) return;
+        if (hoveredCell.Equals(lastPreviewedCell)) return;
+        lastPreviewedCell = hoveredCell;
+
+        highlight.ClearAoePreview();
+        highlight.ClearHealPreview();
+
+        if (selectedUnit == null || selectedUnit.HasAttacked) return;
+        if (selectedUnit.Definition == null) return;
+
+        var target = grid.GetUnit(hoveredCell);
+        if (target == null || !target.IsAlive) return;
+        if (HexCoord.Distance(selectedUnit.Cell, hoveredCell) > selectedUnit.AttackRange) return;
+
+        // Yellow AOE preview for splash attacks
+        if (target.Faction != selectedUnit.Faction
+            && selectedUnit.Definition.splashMode != SplashMode.None
+            && selectedUnit.Definition.splashRadius > 0)
+        {
+            highlight.ShowAoePreview(ComputeAreaCells(hoveredCell, selectedUnit.Definition.splashRadius, false));
+        }
+
+        // Green heal preview for healers
+        if (target.Faction == selectedUnit.Faction
+            && target.CurrentHP < target.MaxHP
+            && (selectedUnit.Definition.ability == SpecialAbility.HealAlly
+                || selectedUnit.Definition.ability == SpecialAbility.AoeHeal))
+        {
+            var cells = new List<HexCoord> { hoveredCell };
+            if (selectedUnit.Definition.ability == SpecialAbility.AoeHeal)
+            {
+                int radius = selectedUnit.Definition.splashRadius;
+                if (radius <= 0) radius = 1;
+                cells.AddRange(ComputeAreaCells(hoveredCell, radius, false));
+            }
+            highlight.ShowHealPreview(cells);
+        }
+    }
+
+    private List<HexCoord> ComputeAreaCells(HexCoord center, int radius, bool includeCenter)
+    {
+        var cells = new List<HexCoord>();
+        for (int dq = -radius; dq <= radius; dq++)
+        {
+            int rMin = Mathf.Max(-radius, -dq - radius);
+            int rMax = Mathf.Min(radius, -dq + radius);
+            for (int dr = rMin; dr <= rMax; dr++)
+            {
+                if (dq == 0 && dr == 0 && !includeCenter) continue;
+                var cell = new HexCoord(center.q + dq, center.r + dr);
+                if (!grid.Contains(cell)) continue;
+                cells.Add(cell);
+            }
+        }
+        return cells;
+    }
+
+    // ==================================================================
+    //  CLICK
+    // ==================================================================
 
     private void HandleClick(HexCoord cell)
     {
@@ -120,6 +205,21 @@ public class HexSelector : MonoBehaviour
         // Clicking the same unit → toggle off
         if (clicked == selectedUnit) { Deselect(); return; }
 
+        // Healer clicked a wounded ally in range → heal
+        if (IsHealer(selectedUnit)
+            && clicked != null
+            && clicked.Faction == Faction.Player
+            && clicked.IsAlive
+            && clicked.CurrentHP < clicked.MaxHP
+            && HexCoord.Distance(selectedUnit.Cell, clicked.Cell) <= selectedUnit.AttackRange)
+        {
+            StatsManager.Instance.ResolveHeal(selectedUnit, clicked);
+            selectedUnit.MarkAttacked();
+            OnUnitHealed?.Invoke(selectedUnit, clicked);
+            Deselect();
+            return;
+        }
+
         // Clicking another friendly player unit → switch selection
         if (clicked != null && clicked.Faction == Faction.Player)
         {
@@ -139,12 +239,19 @@ public class HexSelector : MonoBehaviour
                 StatsManager.Instance.ResolveAttack(selectedUnit, clicked);
                 selectedUnit.MarkAttacked();
                 OnUnitAttacked?.Invoke(selectedUnit, clicked);
+
+                // Cataphract keeps selection if they still have movement (Double Move)
+                if (selectedUnit.CanMove)
+                {
+                    RefreshHighlights();
+                    return;
+                }
             }
             Deselect();
             return;
         }
 
-        // Clicking an empty cell → move if it's reachable & we have budget
+        // Clicking an empty cell → move if reachable
         if (clicked == null
             && selectedUnit.CanMove
             && cachedMoveCosts != null
@@ -158,8 +265,12 @@ public class HexSelector : MonoBehaviour
             selectedUnit.SnapTo(grid.CellToWorld(cell));
             selectedUnit.SpendMovement(moveCost);
 
+            // Terrain entry damage (vine)
+            ApplyEntryDamage(selectedUnit, cell);
+
             OnUnitMoved?.Invoke(selectedUnit, from);
 
+            if (!selectedUnit.IsAlive) { Deselect(); return; }
             if (selectedUnit.CanMove) RefreshHighlights();
             else Deselect();
             return;
@@ -168,11 +279,38 @@ public class HexSelector : MonoBehaviour
         Deselect();
     }
 
+    private void ApplyEntryDamage(Unit unit, HexCoord cell)
+    {
+        if (unit == null || grid == null || grid.TerrainMap == null) return;
+
+        int dmg = grid.TerrainMap.GetEntryDamage(cell);
+        if (dmg <= 0) return;
+
+        var terrain = grid.TerrainMap.GetTerrain(cell);
+        string name = terrain != null ? terrain.terrainName : "terrain";
+
+        unit.TakeDamage(dmg);
+        Debug.Log($"[Terrain] {unit.UnitName} took {dmg} dmg entering {name}. " +
+                  $"({unit.CurrentHP}/{unit.MaxHP} HP)");
+    }
+
+    private bool IsHealer(Unit u)
+    {
+        if (u == null || u.Definition == null || u.HasAttacked) return false;
+        var a = u.Definition.ability;
+        return a == SpecialAbility.HealAlly || a == SpecialAbility.AoeHeal;
+    }
+
+    // ==================================================================
+    //  SELECTION STATE
+    // ==================================================================
+
     private void Select(Unit unit)
     {
         selectedUnit = unit;
         SelectedCell = unit.Cell;
         HasSelection = true;
+        ResetPreviewTracking();
         RefreshHighlights();
         OnUnitSelected?.Invoke(unit);
     }
@@ -185,8 +323,14 @@ public class HexSelector : MonoBehaviour
         HasSelection = false;
 
         if (selectionHighlight != null) selectionHighlight.gameObject.SetActive(false);
-        if (highlight != null) highlight.Clear();       // also clears the outline
+        if (highlight != null) highlight.Clear();
+        ResetPreviewTracking();
         if (had) OnDeselected?.Invoke();
+    }
+
+    private void ResetPreviewTracking()
+    {
+        lastPreviewedCell = new HexCoord(int.MinValue, int.MinValue);
     }
 
     private void RefreshHighlights()
@@ -195,16 +339,18 @@ public class HexSelector : MonoBehaviour
 
         SelectedCell = selectedUnit.Cell;
 
-        // ---- Movement fills ----
         cachedMoveCosts = selectedUnit.CanMove
             ? grid.GetReachableCosts(selectedUnit)
             : new Dictionary<HexCoord, int>();
 
-        var enemies = grid.GetAllEnemiesOf(selectedUnit.Faction);
+        // Hide enemy fills if the unit has already attacked (can't attack again)
+        var enemies = selectedUnit.HasAttacked
+            ? new List<Unit>()
+            : grid.GetAllEnemiesOf(selectedUnit.Faction);
+
         if (highlight != null)
             highlight.Show(selectedUnit, grid, new List<HexCoord>(cachedMoveCosts.Keys), enemies);
 
-        // ---- Attack range outline ----
         if (highlight != null)
         {
             if (!selectedUnit.HasAttacked && selectedUnit.AttackRange > 0)
@@ -213,7 +359,6 @@ public class HexSelector : MonoBehaviour
                 highlight.ClearAttackOutline();
         }
 
-        // ---- Selection ring ----
         if (selectionHighlight != null)
         {
             selectionHighlight.gameObject.SetActive(true);
@@ -222,26 +367,14 @@ public class HexSelector : MonoBehaviour
         }
     }
 
-    /// <summary>Every cell within the unit's attack range, excluding its own cell.</summary>
     private List<HexCoord> GetCellsInAttackRange(Unit unit)
     {
-        var result = new List<HexCoord>();
-        if (unit == null) return result;
+        if (unit == null || unit.AttackRange <= 0) return new List<HexCoord>();
+        return ComputeAreaCells(unit.Cell, unit.AttackRange, includeCenter: false);
+    }
 
-        int r = unit.AttackRange;
-        if (r <= 0) return result;
-
-        for (int dq = -r; dq <= r; dq++)
-        {
-            int rMin = Mathf.Max(-r, -dq - r);
-            int rMax = Mathf.Min(r, -dq + r);
-            for (int dr = rMin; dr <= rMax; dr++)
-            {
-                if (dq == 0 && dr == 0) continue;    // skip unit's own cell
-                var cell = new HexCoord(unit.Cell.q + dq, unit.Cell.r + dr);
-                if (grid.Contains(cell)) result.Add(cell);
-            }
-        }
-        return result;
+    private void HandleUnitDied(Unit unit)
+    {
+        if (unit == selectedUnit) Deselect();
     }
 }
