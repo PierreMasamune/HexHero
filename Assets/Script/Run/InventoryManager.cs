@@ -2,10 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Holds every troop the player owns (bought, damaged, healed) between fights,
-/// plus the consumable items. Persists via RunState.
-/// </summary>
 public class InventoryManager : MonoBehaviour
 {
     public static InventoryManager Instance { get; private set; }
@@ -13,12 +9,24 @@ public class InventoryManager : MonoBehaviour
     [Header("Config")]
     [SerializeField] private int baseUnitCap = 6;
 
-    // ===== Troops =====
-    private readonly List<UnitInstance> units = new();
+    // ★ NEW: Now visible in the Inspector! (Removed 'readonly' so you can edit it in the Inspector for testing)
+    [Header("Troops (Visible in Inspector)")]
+    [SerializeField] private List<UnitInstance> units = new();
     public IReadOnlyList<UnitInstance> Units => units;
 
-    // ===== Items (counts, not instances — items are stateless) =====
-    private readonly Dictionary<string, int> items = new(); // itemId -> count
+    // ★ NEW: A visual list for the Inspector, since Unity can't show Dictionaries
+    [System.Serializable]
+    public class ItemEntry
+    {
+        public string itemId;
+        public int count;
+    }
+
+    [Header("Items (For Testing in Inspector)")]
+    [SerializeField] private List<ItemEntry> startWithItems = new();
+
+    // The actual runtime dictionary (hidden from Inspector)
+    private readonly Dictionary<string, int> items = new();
     public IReadOnlyDictionary<string, int> Items => items;
 
     // ===== Unit cap =====
@@ -34,6 +42,15 @@ public class InventoryManager : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+
+        // Load the starting items you added in the Inspector into the Dictionary
+        foreach (var entry in startWithItems)
+        {
+            if (!string.IsNullOrEmpty(entry.itemId) && entry.count > 0)
+            {
+                AddItem(entry.itemId, entry.count);
+            }
+        }
     }
 
     // ============================================================
@@ -58,10 +75,6 @@ public class InventoryManager : MonoBehaviour
         if (units.Remove(instance)) OnUnitsChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Puts a previously-deployed UnitInstance back into the inventory (preserving its HP).
-    /// Returns false if the cap would be exceeded.
-    /// </summary>
     public bool ReturnUnit(UnitInstance instance)
     {
         if (instance == null || instance.definition == null) return false;
@@ -77,11 +90,9 @@ public class InventoryManager : MonoBehaviour
         OnUnitsChanged?.Invoke();
         return true;
     }
-    /// <summary>Called after a battle ends. Returns all survivors to inventory (with their final HP).</summary>
+
     public void MergeSurvivors(IEnumerable<(UnitDefinition def, int hpAfterBattle)> survivors)
     {
-        // Called from FightNodeController after the fight — implementation in Slice 3.
-        // Left as a stub here so the class is complete and unit-testable.
         OnUnitsChanged?.Invoke();
     }
 
@@ -113,7 +124,7 @@ public class InventoryManager : MonoBehaviour
     }
 
     // ============================================================
-    //  ITEMS
+    //  ITEMS (Shop uses these methods)
     // ============================================================
 
     public void AddItem(string itemId, int count = 1)
@@ -141,7 +152,7 @@ public class InventoryManager : MonoBehaviour
     }
 
     // ============================================================
-    //  SAVE / LOAD (called by RunState)
+    //  SAVE / LOAD
     // ============================================================
 
     public void RestoreFromRunState(List<UnitInstance> savedUnits, Dictionary<string, int> savedItems, int savedCapBonus)

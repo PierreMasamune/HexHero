@@ -10,11 +10,11 @@ public class HexHighlightManager : MonoBehaviour
     [SerializeField] private float sizeShrink = 0.90f;
 
     [Header("Colors (auto-material)")]
-    [SerializeField] private Color moveColor = new Color(0.25f, 0.55f, 1f, 0.45f);           // blue
-    [SerializeField] private Color attackColor = new Color(1f, 0.25f, 0.25f, 0.55f);         // red
-    [SerializeField] private Color cannotAttackColor = new Color(1f, 1f, 1f, 0.35f);         // white
-    [SerializeField] private Color aoeColor = new Color(1f, 0.85f, 0.15f, 0.6f);              // yellow
-    [SerializeField] private Color healColor = new Color(0.25f, 1f, 0.35f, 0.6f);            // green
+    [SerializeField] private Color moveColor = new Color(0.25f, 0.55f, 1f, 0.45f);
+    [SerializeField] private Color attackColor = new Color(1f, 0.25f, 0.25f, 0.55f);
+    [SerializeField] private Color cannotAttackColor = new Color(1f, 1f, 1f, 0.35f);
+    [SerializeField] private Color aoeColor = new Color(1f, 0.85f, 0.15f, 0.6f);
+    [SerializeField] private Color healColor = new Color(0.25f, 1f, 0.35f, 0.6f);
 
     [Header("Optional override materials")]
     [SerializeField] private Material moveMaterial;
@@ -26,6 +26,15 @@ public class HexHighlightManager : MonoBehaviour
     [Header("Preview Y Bumps")]
     [SerializeField] private float aoeYOffset = 0.005f;
     [SerializeField] private float healYOffset = 0.006f;
+
+    [Header("Placement Outline (White)")]
+    [Tooltip("Increase this if the white outline is hidden inside the 3D hex mesh. Try 0.1 or 0.15")]
+    [SerializeField] private float placementOutlineYOffset = 0.08f;
+    [Tooltip("Thickness of the white line.")]
+    [Range(0.01f, 0.2f)]
+    [SerializeField] private float placementOutlineWidth = 0.05f;
+    [SerializeField] private Color placementOutlineColor = new Color(1f, 1f, 1f, 1f); // Pure white
+    [SerializeField] private Material placementOutlineMaterialOverride;
 
     [Header("Attack Range Outline")]
     [SerializeField] private AttackOutlineMode attackOutlineMode = AttackOutlineMode.RegionBoundary;
@@ -39,6 +48,11 @@ public class HexHighlightManager : MonoBehaviour
     private Mesh flatHex;
     private Mesh attackOutlineMesh;
     private Material attackOutlineMaterial;
+
+    private Mesh placementOutlineMesh;
+    private Material placementOutlineMaterial;
+    private readonly List<HexCoord> placementCells = new();
+    private bool placementOutlineVisible;
 
     private readonly List<HexCoord> moveCells = new();
     private readonly List<HexCoord> attackCells = new();
@@ -63,10 +77,14 @@ public class HexHighlightManager : MonoBehaviour
         attackOutlineMaterial = attackOutlineMaterialOverride != null
             ? attackOutlineMaterialOverride
             : MakeUnlit(attackOutlineColor);
+
+        placementOutlineMaterial = placementOutlineMaterialOverride != null
+            ? placementOutlineMaterialOverride
+            : MakeUnlit(placementOutlineColor);
     }
 
     // ==================================================================
-    //  FILLS
+    //  FILLS & PREVIEWS
     // ==================================================================
 
     public void Show(Unit selected, HexGridManager g, List<HexCoord> moves, List<Unit> enemies)
@@ -97,10 +115,6 @@ public class HexHighlightManager : MonoBehaviour
         ClearAttackOutline();
     }
 
-    // ==================================================================
-    //  PREVIEWS
-    // ==================================================================
-
     public void ShowAoePreview(IList<HexCoord> cells)
     {
         aoeCells.Clear();
@@ -118,7 +132,54 @@ public class HexHighlightManager : MonoBehaviour
     public void ClearHealPreview() => healCells.Clear();
 
     // ==================================================================
-    //  ATTACK OUTLINE
+    //  PLACEMENT OUTLINE (WHITE)
+    // ==================================================================
+
+    public void ShowPlacementOutline(IList<HexCoord> cells)
+    {
+        placementCells.Clear();
+        if (cells != null) foreach (var c in cells) placementCells.Add(c);
+
+        placementOutlineVisible = placementCells.Count > 0;
+
+        if (placementOutlineVisible) RebuildPlacementOutlineMesh();
+        else if (placementOutlineMesh != null) placementOutlineMesh.Clear();
+    }
+
+    public void ClearPlacementOutline()
+    {
+        placementOutlineVisible = false;
+        placementCells.Clear();
+        if (placementOutlineMesh != null) placementOutlineMesh.Clear();
+    }
+
+    private void RebuildPlacementOutlineMesh()
+    {
+        if (placementOutlineMesh == null) placementOutlineMesh = new Mesh { name = "PlacementOutline" };
+        else placementOutlineMesh.Clear();
+
+        var verts = new List<Vector3>();
+        var tris = new List<int>();
+
+        float outer = grid.CellSize * sizeShrink * 1.02f;
+        // Use the inspector variable for width now!
+        float inner = outer - (grid.CellSize * placementOutlineWidth);
+        Vector3 lift = Vector3.up * placementOutlineYOffset;
+
+        foreach (var cell in placementCells)
+        {
+            Vector3 center = grid.CellToWorld(cell) + lift;
+            for (int i = 0; i < 6; i++)
+                AddEdgeQuad(verts, tris, center, i, outer, inner);
+        }
+
+        placementOutlineMesh.SetVertices(verts);
+        placementOutlineMesh.SetTriangles(tris, 0);
+        placementOutlineMesh.RecalculateBounds();
+    }
+
+    // ==================================================================
+    //  ATTACK OUTLINE (RED)
     // ==================================================================
 
     public void ShowAttackOutline(IList<HexCoord> attackableCells, HexCoord unitCell)
@@ -186,6 +247,10 @@ public class HexHighlightManager : MonoBehaviour
         attackOutlineMesh.RecalculateBounds();
     }
 
+    // ==================================================================
+    //  MESH BUILDERS
+    // ==================================================================
+
     private void AddEdgeQuad(List<Vector3> verts, List<int> tris, Vector3 center, int edgeIndex, float outer, float inner)
     {
         float aA = edgeIndex * 60f * Mathf.Deg2Rad;
@@ -197,19 +262,16 @@ public class HexHighlightManager : MonoBehaviour
         Vector3 vBInner = center + new Vector3(Mathf.Cos(aB) * inner, 0, Mathf.Sin(aB) * inner);
 
         int b = verts.Count;
-        verts.Add(vAOuter);
-        verts.Add(vBOuter);
-        verts.Add(vBInner);
-        verts.Add(vAInner);
+        verts.Add(vAOuter); verts.Add(vBOuter); verts.Add(vBInner); verts.Add(vAInner);
 
+        // Adjust winding order so it renders from above
         tris.Add(b + 0); tris.Add(b + 2); tris.Add(b + 1);
         tris.Add(b + 0); tris.Add(b + 3); tris.Add(b + 2);
     }
 
     private void AddHexRing(List<Vector3> verts, List<int> tris, Vector3 center, float outer, float inner)
     {
-        for (int i = 0; i < 6; i++)
-            AddEdgeQuad(verts, tris, center, i, outer, inner);
+        for (int i = 0; i < 6; i++) AddEdgeQuad(verts, tris, center, i, outer, inner);
     }
 
     // ==================================================================
@@ -228,13 +290,11 @@ public class HexHighlightManager : MonoBehaviour
         DrawCells(aoeCells, aoeMaterial, scale, Vector3.up * (yOffset + aoeYOffset));
         DrawCells(healCells, healMaterial, scale, Vector3.up * (yOffset + healYOffset));
 
-        if (attackOutlineVisible
-            && attackOutlineMesh != null
-            && attackOutlineMesh.vertexCount > 0
-            && attackOutlineMaterial != null)
-        {
+        if (attackOutlineVisible && attackOutlineMesh != null && attackOutlineMaterial != null)
             Graphics.DrawMesh(attackOutlineMesh, Matrix4x4.identity, attackOutlineMaterial, 0);
-        }
+
+        if (placementOutlineVisible && placementOutlineMesh != null && placementOutlineMaterial != null)
+            Graphics.DrawMesh(placementOutlineMesh, Matrix4x4.identity, placementOutlineMaterial, 0);
     }
 
     private void DrawCells(List<HexCoord> cells, Material mat, float scale, Vector3 lift)
@@ -248,7 +308,7 @@ public class HexHighlightManager : MonoBehaviour
     }
 
     // ==================================================================
-    //  MESH / MATERIAL HELPERS
+    //  HELPERS
     // ==================================================================
 
     private static Mesh BuildFlatHexMesh()
@@ -277,9 +337,7 @@ public class HexHighlightManager : MonoBehaviour
 
     private static Material MakeUnlit(Color c)
     {
-        var shader = Shader.Find("Sprites/Default")
-                     ?? Shader.Find("Unlit/Transparent")
-                     ?? Shader.Find("Unlit/Color");
+        var shader = Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Transparent") ?? Shader.Find("Unlit/Color");
         var mat = new Material(shader) { name = "Highlight_" + c };
         if (mat.HasProperty("_Color")) mat.SetColor("_Color", c);
         if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", c);
