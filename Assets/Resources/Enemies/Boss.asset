@@ -15,7 +15,7 @@ MonoBehaviour:
   enemyName: Boss
   enemyType: 15
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 3154830789616239351, guid: 5211106dda7fada4b9883c0ab63b0a36, type: 3}
   description: 
   rarity: 3
   tier: 3
@@ -26,14 +26,14 @@ MonoBehaviour:
   attackRange: 4
   critChance: 5
   dodgeChance: 5
-  splashMode: 0
-  splashRadius: 0
-  splashValue: 0
+  splashMode: 2
+  splashRadius: 2
+  splashValue: 1
   killValue: 500
   ability: 4
-  abilityValue: 0
-  summonAtBattleStart: 0
-  summonEveryNTurns: 0
-  summonTemplate: {fileID: 0}
+  abilityValue: 1
+  summonAtBattleStart: 2
+  summonEveryNTurns: 3
+  summonTemplate: {fileID: 11400000, guid: 825b84ce53db5e243a82dd4ca76e9a7d, type: 2}
   isBoss: 1
   shieldPercent: 0

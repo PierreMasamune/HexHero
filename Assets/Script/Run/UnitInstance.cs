@@ -1,16 +1,14 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// A persistent inventory entry. Unlike Unit (the runtime battle object),
-/// UnitInstance lives between fights and carries current HP across nodes.
-/// </summary>
 [Serializable]
 public class UnitInstance
 {
     public UnitDefinition definition;
+
+    // These are public, so you can edit them directly in the Inspector!
     public int currentHP;
-    public int maxHP;            // denormalized from definition for safety
+    public int maxHP;
 
     public bool IsAlive => currentHP > 0;
     public bool IsKing => definition != null && definition.isKing;
@@ -18,8 +16,20 @@ public class UnitInstance
     public UnitInstance(UnitDefinition def)
     {
         definition = def;
-        maxHP = def != null ? def.maxHP : 1;
-        currentHP = maxHP;
+        SyncWithDefinition();
+    }
+
+    /// <summary>
+    /// Pulls the max HP from the definition and heals the unit to full.
+    /// </summary>
+    [ContextMenu("Sync HP with Definition")]
+    public void SyncWithDefinition()
+    {
+        if (definition != null)
+        {
+            maxHP = definition.maxHP;
+            currentHP = maxHP;
+        }
     }
 
     public void TakeDamage(int amount)
@@ -34,7 +44,6 @@ public class UnitInstance
 
     public void FullHeal() => currentHP = maxHP;
 
-    /// <summary>Called after a battle ends — clamps HP into valid range.</summary>
     public void SyncFromBattle(int hpAfterBattle)
     {
         currentHP = Mathf.Clamp(hpAfterBattle, 0, maxHP);

@@ -9,12 +9,11 @@ public class InventoryManager : MonoBehaviour
     [Header("Config")]
     [SerializeField] private int baseUnitCap = 6;
 
-    // ★ NEW: Now visible in the Inspector! (Removed 'readonly' so you can edit it in the Inspector for testing)
-    [Header("Troops (Visible in Inspector)")]
+    // ★ Visible in the Inspector so you can edit HP manually
+    [Header("Troops (Editable for Testing)")]
     [SerializeField] private List<UnitInstance> units = new();
     public IReadOnlyList<UnitInstance> Units => units;
 
-    // ★ NEW: A visual list for the Inspector, since Unity can't show Dictionaries
     [System.Serializable]
     public class ItemEntry
     {
@@ -22,18 +21,15 @@ public class InventoryManager : MonoBehaviour
         public int count;
     }
 
-    [Header("Items (For Testing in Inspector)")]
+    [Header("Items (For Testing)")]
     [SerializeField] private List<ItemEntry> startWithItems = new();
 
-    // The actual runtime dictionary (hidden from Inspector)
     private readonly Dictionary<string, int> items = new();
     public IReadOnlyDictionary<string, int> Items => items;
 
-    // ===== Unit cap =====
     private int permanentCapBonus;
     public int UnitCap => baseUnitCap + permanentCapBonus;
 
-    // ===== Events =====
     public event Action OnUnitsChanged;
     public event Action OnItemsChanged;
     public event Action<int> OnUnitCapChanged;
@@ -43,13 +39,10 @@ public class InventoryManager : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
-        // Load the starting items you added in the Inspector into the Dictionary
         foreach (var entry in startWithItems)
         {
             if (!string.IsNullOrEmpty(entry.itemId) && entry.count > 0)
-            {
                 AddItem(entry.itemId, entry.count);
-            }
         }
     }
 
@@ -63,7 +56,7 @@ public class InventoryManager : MonoBehaviour
         if (def == null) return false;
         if (units.Count >= UnitCap && !def.isKing) return false;
 
-        added = new UnitInstance(def);
+        added = new UnitInstance(def); // Constructor automatically sets maxHP & currentHP
         units.Add(added);
         OnUnitsChanged?.Invoke();
         return true;
@@ -91,9 +84,16 @@ public class InventoryManager : MonoBehaviour
         return true;
     }
 
-    public void MergeSurvivors(IEnumerable<(UnitDefinition def, int hpAfterBattle)> survivors)
+    // ★ NEW: Right-click the InventoryManager component header and select this to fix all HP values
+    [ContextMenu("Sync All HP to Definitions")]
+    public void SyncAllHP()
     {
+        foreach (var unit in units)
+        {
+            if (unit != null) unit.SyncWithDefinition();
+        }
         OnUnitsChanged?.Invoke();
+        Debug.Log("[Inventory] Synced all unit HP to their definitions.");
     }
 
     public int TotalUpkeep()
@@ -102,12 +102,6 @@ public class InventoryManager : MonoBehaviour
         foreach (var u in units)
             if (u.definition != null) sum += u.definition.upkeepCost;
         return sum;
-    }
-
-    public bool HasKing()
-    {
-        foreach (var u in units) if (u.IsKing) return true;
-        return false;
     }
 
     public UnitInstance GetKing()
@@ -124,7 +118,7 @@ public class InventoryManager : MonoBehaviour
     }
 
     // ============================================================
-    //  ITEMS (Shop uses these methods)
+    //  ITEMS
     // ============================================================
 
     public void AddItem(string itemId, int count = 1)
@@ -150,10 +144,6 @@ public class InventoryManager : MonoBehaviour
     {
         return items.TryGetValue(itemId, out int c) ? c : 0;
     }
-
-    // ============================================================
-    //  SAVE / LOAD
-    // ============================================================
 
     public void RestoreFromRunState(List<UnitInstance> savedUnits, Dictionary<string, int> savedItems, int savedCapBonus)
     {

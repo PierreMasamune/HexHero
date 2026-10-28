@@ -13,46 +13,129 @@ MonoBehaviour:
   m_Name: Map_Chapter1
   m_EditorClassIdentifier: Assembly-CSharp::MapData
   nodes:
-  - id: Boss_Chapter_1
-    type: 4
-    chapter: 1
-    position: {x: 0, y: 300}
-    children: []
-    label: 
-  - id: Fight 1
+  - id: Fight4
     type: 1
     chapter: 1
-    position: {x: -200, y: -100}
+    tier: 2
+    position: {x: -218.99998, y: 143.99995}
     children:
-    - Shop 2
+    - Buff4
+    - Shop4
+    label: 
+  - id: Fight6
+    type: 1
+    chapter: 1
+    tier: 2
+    position: {x: -565, y: 102}
+    children:
+    - Buff4
+    label: 
+  - id: Fight 2
+    type: 3
+    chapter: 1
+    tier: 1
+    position: {x: -98.99999, y: -100.00002}
+    children:
+    - Fight3
+    - Fight4
+    label: 
+  - id: Shop4
+    type: 2
+    chapter: 1
+    tier: 2
+    position: {x: 9.00001, y: 508.99997}
+    children:
+    - Boss_Chapter_1
+    label: 
+  - id: Shop2
+    type: 2
+    chapter: 1
+    tier: 2
+    position: {x: 565, y: -78.00002}
+    children:
+    - Fight5
+    label: 
+  - id: Fight1
+    type: 1
+    chapter: 1
+    tier: 1
+    position: {x: -184.99998, y: -503.00003}
+    children:
+    - Shop1
     - Fight 2
     label: 
   - id: Start
     type: 0
     chapter: 1
-    position: {x: 0, y: -300}
+    tier: 1
+    position: {x: 15.00001, y: -703}
     children:
-    - Fight 1
-    - Shop1
+    - Fight1
+    - Buff1
     label: 
-  - id: Shop 2
-    type: 2
+  - id: Buff4
+    type: 3
     chapter: 1
-    position: {x: -200, y: 100}
+    tier: 2
+    position: {x: -370.99997, y: 508.99997}
+    children:
+    - Boss_Chapter_1
+    label: 
+  - id: Boss_Chapter_1
+    type: 4
+    chapter: 1
+    tier: 3
+    position: {x: 15.00001, y: 703}
+    children: []
+    label: 
+  - id: Fight5
+    type: 1
+    chapter: 1
+    tier: 2
+    position: {x: 333.00003, y: 504.99997}
     children:
     - Boss_Chapter_1
     label: 
   - id: Shop1
     type: 2
     chapter: 1
-    position: {x: 200, y: -100}
+    tier: 1
+    position: {x: -408.99997, y: -291.00003}
     children:
-    - Fight 2
+    - Fight4
+    - Fight6
+    label: 
+  - id: Buff3
+    type: 3
+    chapter: 1
+    tier: 2
+    position: {x: 256.00003, y: 140.99998}
+    children:
+    - Shop4
+    - Fight5
+    label: 
+  - id: Fight3
+    type: 1
+    chapter: 1
+    tier: 2
+    position: {x: 239.00002, y: -72.00003}
+    children:
+    - Buff3
     label: 
   - id: Fight 2
     type: 1
     chapter: 1
-    position: {x: 200, y: 100}
+    tier: 1
+    position: {x: 352, y: -317.00003}
     children:
-    - Boss_Chapter_1
+    - Fight3
+    - Shop2
+    label: 
+  - id: Buff1
+    type: 3
+    chapter: 1
+    tier: 1
+    position: {x: 215.00002, y: -503.00003}
+    children:
+    - Fight 2
     label: 

@@ -316,6 +316,7 @@ public class PreparingController : MonoBehaviour
     private UnitDefinition EnemyToUnitDef(EnemyDefinition e)
     {
         if (enemyDefCache.TryGetValue(e, out var c)) return c;
+
         var d = ScriptableObject.CreateInstance<UnitDefinition>();
         d.unitName = e.enemyName; d.maxHP = e.maxHP; d.defense = e.defense; d.attack = e.attack;
         d.movementRange = e.movementRange; d.attackRange = e.attackRange;
@@ -323,7 +324,15 @@ public class PreparingController : MonoBehaviour
         d.unitPrefab = e.unitPrefab; d.splashMode = e.splashMode; d.splashRadius = e.splashRadius;
         d.splashValue = e.splashValue; d.ability = e.ability; d.abilityValue = e.abilityValue;
         d.summonAtBattleStart = e.summonAtBattleStart; d.summonEveryNTurns = e.summonEveryNTurns;
-        d.killReward = e.killValue; enemyDefCache[e] = d;
+        d.killReward = e.killValue;
+
+        // ★ NEW: Convert the enemy's summon template into a UnitDefinition for the runtime unit
+        if (e.summonTemplate != null)
+        {
+            d.summonTemplate = EnemyToUnitDef(e.summonTemplate);
+        }
+
+        enemyDefCache[e] = d;
         return d;
     }
 

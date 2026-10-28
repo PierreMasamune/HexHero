@@ -71,7 +71,7 @@ public static class DefaultAssetGenerator
     private static void GenerateTroops()
     {
         // ----- TIER 1 (Common) -----
-        CreateTroop(TroopType.Barb, "Barb", 1, Rarity.Common,
+        CreateTroop(TroopType.Barbarian, "Barbarian", 1, Rarity.Common,
             new[] { UnitTag.Melee, UnitTag.Human },
             10, 1, 3, 3, 1, 10, 5, 10, 43);
 

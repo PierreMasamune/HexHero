@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3f7af079ce90b7c47b1f289be4698dce, type: 3}
-  m_Name: Barb
+  m_Name: Barbarian
   m_EditorClassIdentifier: Assembly-CSharp::UnitDefinition
-  unitName: Barb
+  unitName: Barbarian
   troopType: 0
   icon: {fileID: 0}
   unitPrefab: {fileID: 7556589955399825650, guid: 021c3913c7e7cab4688f9ac0de91d61f, type: 3}

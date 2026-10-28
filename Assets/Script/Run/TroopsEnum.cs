@@ -5,7 +5,7 @@ public enum Rarity { Common, Rare, Epic, Legendary }
 public enum TroopType
 {
     // T1
-    Barb, Squire, Slinger, Apprentice, Cleric, Thief, Horseman, Peasant, Herd,
+    Barbarian, Squire, Slinger, Apprentice, Cleric, Thief, Horseman, Peasant, Herd,
     // T2
     Berserk, Knight, Longbow, Mage, Priest, Rogue, Cavalry, Farmer, BeastHandler,
     // T3

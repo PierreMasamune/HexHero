@@ -15,4 +15,5 @@ MonoBehaviour:
   tier1Fights:
   - {fileID: 11400000, guid: f3bb951315a656646b526d7b81d897b8, type: 2}
   tier2Fights: []
-  tier3Fights: []
+  tier3Fights:
+  - {fileID: 11400000, guid: 6555dc32779151a47a7fad0308ce8b06, type: 2}
