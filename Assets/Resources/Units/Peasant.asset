@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Peasant
   troopType: 7
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 1763961702916410598, guid: 827f0a12ac54b1747a8737eee0bbf2ec, type: 3}
   description: 
   tags: 0000000004000000
   rarity: 0
@@ -32,6 +32,7 @@ MonoBehaviour:
   splashValue: 0
   upkeepCost: 0
   recruitCost: 50
+  killReward: 0
   ability: 8
   abilityValue: 10
   summonAtBattleStart: 0

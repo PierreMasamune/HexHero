@@ -15,7 +15,7 @@ MonoBehaviour:
   enemyName: Goblin Rider
   enemyType: 3
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 4145556869808025158, guid: b8cfbf675ef46db4eab805fc0df81301, type: 3}
   description: 
   rarity: 0
   tier: 1

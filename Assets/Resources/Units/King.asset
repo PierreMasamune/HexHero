@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: King
   troopType: 27
   icon: {fileID: 0}
-  unitPrefab: {fileID: 4444262633164054651, guid: 03e2ad957faf0c9438c602dc47691d78, type: 3}
+  unitPrefab: {fileID: 3154830789616239351, guid: 5211106dda7fada4b9883c0ab63b0a36, type: 3}
   description: 
   tags: 090000000000000004000000
   rarity: 3
@@ -32,6 +32,7 @@ MonoBehaviour:
   splashValue: 0
   upkeepCost: 0
   recruitCost: 0
+  killReward: 0
   ability: 0
   abilityValue: 0
   summonAtBattleStart: 0

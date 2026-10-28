@@ -15,7 +15,7 @@ MonoBehaviour:
   enemyName: Goblin Mage
   enemyType: 2
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 8906348017994948356, guid: 8f099b1707c94ab4393fc7335fd85da5, type: 3}
   description: 
   rarity: 0
   tier: 1

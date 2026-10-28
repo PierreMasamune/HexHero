@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Barb
   troopType: 0
   icon: {fileID: 0}
-  unitPrefab: {fileID: 1279107688498505540, guid: b79bee0a910a0554fae4936b0c7a3135, type: 3}
+  unitPrefab: {fileID: 7556589955399825650, guid: 021c3913c7e7cab4688f9ac0de91d61f, type: 3}
   description: 
   tags: 0000000004000000
   rarity: 0
@@ -32,6 +32,7 @@ MonoBehaviour:
   splashValue: 0
   upkeepCost: 10
   recruitCost: 43
+  killReward: 0
   ability: 0
   abilityValue: 0
   summonAtBattleStart: 0

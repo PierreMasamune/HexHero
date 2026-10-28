@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Thief
   troopType: 5
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 451038913085577796, guid: 2180db3d37a26824e9bc0a5ec7666f51, type: 3}
   description: 
   tags: 00000000070000000c00000004000000
   rarity: 0
@@ -32,6 +32,7 @@ MonoBehaviour:
   splashValue: 0
   upkeepCost: 10
   recruitCost: 51
+  killReward: 0
   ability: 0
   abilityValue: 0
   summonAtBattleStart: 0

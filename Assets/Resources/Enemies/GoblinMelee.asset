@@ -15,7 +15,7 @@ MonoBehaviour:
   enemyName: Goblin Melee
   enemyType: 0
   icon: {fileID: 0}
-  unitPrefab: {fileID: 2358977501691462179, guid: 52b3b56e307f9d44d81dbc32f4645ec3, type: 3}
+  unitPrefab: {fileID: 9174591235533430650, guid: 46a5f97eade5c2e48a40641192fe7c3f, type: 3}
   description: 
   rarity: 0
   tier: 1

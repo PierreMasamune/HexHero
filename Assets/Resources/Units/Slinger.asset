@@ -15,7 +15,7 @@ MonoBehaviour:
   unitName: Slinger
   troopType: 2
   icon: {fileID: 0}
-  unitPrefab: {fileID: 0}
+  unitPrefab: {fileID: 4051796644740985516, guid: 769156993eb648240b0f6543882e9a39, type: 3}
   description: 
   tags: 0100000004000000
   rarity: 0
@@ -32,6 +32,7 @@ MonoBehaviour:
   splashValue: 0
   upkeepCost: 10
   recruitCost: 54
+  killReward: 0
   ability: 0
   abilityValue: 0
   summonAtBattleStart: 0
