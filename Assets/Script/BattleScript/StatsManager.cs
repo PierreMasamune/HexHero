@@ -111,6 +111,9 @@ public class StatsManager : MonoBehaviour
         result.PrimaryDamage = damage;
         result.PrimaryKilled = !defender.IsAlive;
 
+        FloatingDamageText.Spawn(defender.transform.position, damage, crit, defender.MaxHP);
+
+
         Debug.Log($"{attacker.UnitName} → {defender.UnitName}: {damage} dmg " +
                   $"({defender.CurrentHP}/{defender.MaxHP} HP)");
 
@@ -146,6 +149,7 @@ public class StatsManager : MonoBehaviour
             hit.Damage = damage;
             hit.Killed = !target.IsAlive;
             result.SplashHits.Add(hit);
+            FloatingDamageText.Spawn(target.transform.position, damage, false, target.MaxHP);
 
             Debug.Log($"[Splash] {attacker.UnitName} → {target.UnitName}: {damage} dmg " +
                       $"({target.CurrentHP}/{target.MaxHP} HP)");

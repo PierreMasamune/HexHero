@@ -918595,7 +918595,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &948374241
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1507710,8 +1507710,8 @@ MonoBehaviour:
   placementZoneRadius: 4
   autoPlaceKing: 1
   preferredKingCell:
-    q: -7
-    r: 0
+    q: 0
+    r: -7
   manualEnemySetup: []
   showPlacementOutlines: 1
   preSpawnEnemiesDuringPreparation: 1

@@ -76,6 +76,7 @@ public class Unit : MonoBehaviour
 
     // ===== Events =====
     public event Action<Unit> OnDied;
+    public event Action<int, int> OnHPChanged;
 
     // ==================================================================
     //  LIFECYCLE
@@ -182,6 +183,7 @@ public class Unit : MonoBehaviour
     {
         if (!IsAlive) return;
         currentHP = Mathf.Max(0, currentHP - amount);
+        OnHPChanged?.Invoke(currentHP, maxHP);
         if (currentHP == 0) OnDied?.Invoke(this);
     }
 
@@ -189,5 +191,6 @@ public class Unit : MonoBehaviour
     {
         if (!IsAlive) return;
         currentHP = Mathf.Min(maxHP, currentHP + amount);
+        OnHPChanged?.Invoke(currentHP, maxHP);
     }
 }
