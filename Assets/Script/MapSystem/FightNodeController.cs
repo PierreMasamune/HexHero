@@ -8,41 +8,46 @@ public class FightNodeController : MonoBehaviour, IMapNodeController
     [SerializeField] private PreparingController preparingController;
     [SerializeField] private GameObject battleCanvasRoot;
 
+    [Header("Data")]
+    [SerializeField] private FightCatalog fightCatalog;
+    [SerializeField] private HexTerrainMap terrainMap;
+
     public string CurrentNodeId { get; private set; }
     public event Action<IMapNodeController, MapNodeResult> OnComplete;
 
-    private MapNodeData node;
-
-    public void Enter(MapNodeData nodeData, RunState state)
+    public void Enter(MapNodeData node, RunState state)
     {
-        node = nodeData;
         CurrentNodeId = node.id;
-
         if (battleCanvasRoot != null) battleCanvasRoot.SetActive(true);
 
-        // TurnManager begins in Preparing state — PreparingController drives from there
-        if (turnManager != null) turnManager.OnStateChanged += HandleTurnState;
-        if (preparingController != null) preparingController.EnterPreparing();
-        else Debug.LogWarning("[FightNodeController] No PreparingController — battle cannot start.");
-    }
+        // ★ NEW: Use the node's specific tier instead of the player's depth
+        FightDefinition chosenFight = fightCatalog.GetRandomFight(node.tier);
 
-    private void HandleTurnState(TurnState newState)
-    {
-        if (newState == TurnState.Victory)
+        if (chosenFight == null)
         {
-            Unsubscribe();
+            Debug.LogError($"[FightNodeController] No fights found for Tier {node.tier}!");
             RaiseComplete(MapNodeResult.Success);
+            return;
         }
-        else if (newState == TurnState.Defeat)
+
+        if (terrainMap != null)
         {
-            Unsubscribe();
-            RaiseComplete(MapNodeResult.Fail);
+            terrainMap.ApplyTerrainLayout(chosenFight.terrain);
+        }
+
+        if (preparingController != null)
+        {
+            preparingController.OnFightComplete += HandleFightComplete;
+            preparingController.LoadBattle(chosenFight);
         }
     }
 
-    private void Unsubscribe()
+    private void HandleFightComplete(MapNodeResult result)
     {
-        if (turnManager != null) turnManager.OnStateChanged -= HandleTurnState;
+        if (preparingController != null)
+            preparingController.OnFightComplete -= HandleFightComplete;
+
+        RaiseComplete(result);
     }
 
     public void RaiseComplete(MapNodeResult result)

@@ -66,6 +66,7 @@ public static class MapBaker
                 id = m.id,
                 type = m.type,
                 chapter = m.chapter,
+                tier = m.tier,
                 label = m.label,
                 position = new Vector2(px, py)
             };
