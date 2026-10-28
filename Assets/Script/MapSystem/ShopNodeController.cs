@@ -3,8 +3,8 @@ using UnityEngine;
 
 public class ShopNodeController : MonoBehaviour, IMapNodeController
 {
-    [Header("Shop UI (assigned to friend's shop panel)")]
-    [SerializeField] private GameObject shopRoot;
+    [Header("References")]
+    [SerializeField] private ShopUI shopUI;
 
     public string CurrentNodeId { get; private set; }
     public event Action<IMapNodeController, MapNodeResult> OnComplete;
@@ -13,23 +13,29 @@ public class ShopNodeController : MonoBehaviour, IMapNodeController
     {
         CurrentNodeId = node.id;
 
-        if (shopRoot != null) shopRoot.SetActive(true);
-
-        // TODO: wire friend's shop system to call LeaveShop() when the player is done.
-        Debug.Log($"[ShopNodeController] Entered shop node {node.id}. " +
-                  $"Call LeaveShop() to return to the map.");
+        if (shopUI != null)
+        {
+            shopUI.OnShopClosed += HandleShopClosed;
+            shopUI.OpenShop(); // ★ Open the shop window
+        }
+        else
+        {
+            Debug.LogWarning("[ShopNodeController] No ShopUI assigned. Skipping node.");
+            OnComplete?.Invoke(this, MapNodeResult.Success);
+        }
     }
 
-    /// <summary>Wire to the shop's "Leave" button or call from friend's shop code when done.</summary>
-    public void LeaveShop()
+    private void HandleShopClosed()
     {
-        if (shopRoot != null) shopRoot.SetActive(false);
+        if (shopUI != null) shopUI.OnShopClosed -= HandleShopClosed;
+
+        // Player finished shopping, return to map
         OnComplete?.Invoke(this, MapNodeResult.Success);
     }
 
     public void RaiseComplete(MapNodeResult result)
     {
-        if (shopRoot != null) shopRoot.SetActive(false);
+        if (shopUI != null) shopUI.OnShopClosed -= HandleShopClosed;
         OnComplete?.Invoke(this, result);
     }
 }

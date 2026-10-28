@@ -101,7 +101,10 @@ public class RunManager : MonoBehaviour
         pendingNodeId = nodeId;
 
         if (mapRoot != null) mapRoot.SetActive(false);
-        if (battleRoot != null) battleRoot.SetActive(true);
+
+        // ★ Only turn on the battle scene if this is a Fight or Boss node!
+        bool isBattleNode = (node.type == MapNodeType.Fight || node.type == MapNodeType.Boss);
+        if (battleRoot != null) battleRoot.SetActive(isBattleNode);
 
         activeController = GetControllerFor(node.type);
         if (activeController == null)

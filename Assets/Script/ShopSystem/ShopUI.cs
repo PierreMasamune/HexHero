@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -23,19 +24,21 @@ public class ShopUI : MonoBehaviour
     [Tooltip("Drag your Battle Canvas (or the HUD panel) here so it hides while shopping.")]
     [SerializeField] private GameObject battleHUD;
 
+    public event Action OnShopClosed; // ★ NEW: Fires when the player closes the shop
+
     private ShopController shop;
     private bool isOpen = false;
 
     private void Start()
     {
         shop = ShopController.Instance;
-        if (shop == null) { Debug.LogError("No ShopController found!"); return; }
+        if (shop == null) { Debug.LogError("No ShopController found! Did you put ShopController on a GameObject?"); return; }
 
         shop.OnShopUpdated += RefreshUI;
         if (EconomyManager.Instance != null)
             EconomyManager.Instance.OnMoneyChanged += HandleMoneyChanged;
 
-        closeButton.onClick.AddListener(ToggleShop);
+        closeButton.onClick.AddListener(CloseShop);
         rerollButton.onClick.AddListener(() => shop.Reroll());
 
         shopPanel.SetActive(false);
@@ -50,26 +53,35 @@ public class ShopUI : MonoBehaviour
     private void Update()
     {
         if (Keyboard.current != null && Keyboard.current.f2Key.wasPressedThisFrame)
-            ToggleShop();
+        {
+            if (isOpen) CloseShop();
+            else OpenShop();
+        }
     }
 
-    public void ToggleShop()
+    public void OpenShop()
     {
-        isOpen = !isOpen;
-        shopPanel.SetActive(isOpen);
+        if (isOpen) return;
+        isOpen = true;
+        shopPanel.SetActive(true);
 
-        // Hide or show the battle HUD
-        if (battleHUD != null)
-            battleHUD.SetActive(!isOpen);
+        if (battleHUD != null) battleHUD.SetActive(false);
+        if (titleLabel != null) titleLabel.text = "Merchant";
 
-        if (isOpen)
-        {
-            titleLabel.text = "Merchant";
-            RefreshUI();
+        shopPanel.transform.SetAsLastSibling(); // Render on top
+        shop.GenerateStock(); // Generate fresh stock when opening
+        RefreshUI();
+    }
 
-            // Push the Shop to the front so it renders above everything else
-            shopPanel.transform.SetAsLastSibling();
-        }
+    public void CloseShop()
+    {
+        if (!isOpen) return;
+        isOpen = false;
+        shopPanel.SetActive(false);
+
+        if (battleHUD != null) battleHUD.SetActive(true);
+
+        OnShopClosed?.Invoke(); // ★ Tell the node controller we are done
     }
 
     private void HandleMoneyChanged(int newBalance)
