@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class RunManager : MonoBehaviour
 {
@@ -28,7 +29,7 @@ public class RunManager : MonoBehaviour
     public RunState State { get; private set; }
 
     private IMapNodeController activeController;
-    private string pendingNodeId;   // node we're currently inside
+    private string pendingNodeId;
 
     // ==================================================================
     //  LIFECYCLE
@@ -39,7 +40,6 @@ public class RunManager : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
-        // Load or create RunState
         if (SaveSystem.TryLoad(out RunState loaded))
         {
             State = loaded;
@@ -59,7 +59,26 @@ public class RunManager : MonoBehaviour
     }
 
     // ==================================================================
-    //  MAP
+    //  EDITOR / CONTEXT MENU UTILITY
+    // ==================================================================
+
+    [ContextMenu("Reset Run (Delete Save & Reset State)")]
+    public void ResetRunFromEditor()
+    {
+        SaveSystem.DeleteSave();
+        State = new RunState();
+
+        Debug.Log("[RunManager] Run has been reset. State wiped.");
+
+        if (Application.isPlaying)
+        {
+            // If we are in Play mode, reload the scene to fully restart everything
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+    }
+
+    // ==================================================================
+    //  MAP LOGIC
     // ==================================================================
 
     public void ShowMap()
@@ -140,10 +159,6 @@ public class RunManager : MonoBehaviour
         }
     }
 
-    // ==================================================================
-    //  RUN OVER
-    // ==================================================================
-
     private void HandleRunOver()
     {
         State.isRunOver = true;
@@ -153,10 +168,6 @@ public class RunManager : MonoBehaviour
         if (battleRoot != null) battleRoot.SetActive(false);
         if (runOverRoot != null) runOverRoot.SetActive(true);
     }
-
-    // ==================================================================
-    //  PUBLIC HELPERS (for node controllers)
-    // ==================================================================
 
     public void CompleteActiveNode(MapNodeResult result)
     {

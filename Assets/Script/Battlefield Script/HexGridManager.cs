@@ -132,13 +132,26 @@ public class HexGridManager : MonoBehaviour
         return list;
     }
     /// <summary>All cells in the player zone (q &lt;= maxQ) that currently have no living unit.</summary>
-    public List<HexCoord> GetEmptyPlayerZoneCells(int maxQ = 0)
+    /// <summary>All cells within `radius` of `center` that have no unit and aren't Water/Vine.</summary>
+    public List<HexCoord> GetEmptyZoneCells(HexCoord center, int radius)
     {
         var list = new List<HexCoord>();
         foreach (var cell in AllCells())
         {
-            if (cell.q > maxQ) continue;
+            // 1. Check distance from the center
+            if (HexCoord.Distance(center, cell) > radius) continue;
+
+            // 2. Check if occupied
             if (GetUnit(cell) != null) continue;
+
+            // 3. Check terrain (no Water, no Vine)
+            if (terrainMap != null)
+            {
+                var terr = terrainMap.GetTerrain(cell);
+                if (terr != null && (terr.terrainType == TerrainType.Water || terr.terrainType == TerrainType.Vine))
+                    continue;
+            }
+
             list.Add(cell);
         }
         return list;

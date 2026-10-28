@@ -4,14 +4,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Minimal preparing-stage UI. Lists every UnitInstance in InventoryManager,
-/// and clicking a card calls PreparingController.SetSelectedInstance so the
-/// player can place that unit on a green-highlighted cell.
-/// 
-/// Replaces the "real" inventory UI for testing until the friend's shop UI
-/// handles preparing-stage placement too.
-/// </summary>
 public class TestPreparingUI : MonoBehaviour
 {
     [Header("References")]
@@ -20,55 +12,56 @@ public class TestPreparingUI : MonoBehaviour
     [SerializeField] private Button cardPrefab;
     [SerializeField] private GameObject emptyMessage;
 
+    [Header("Button State (OPTIONAL — assign only if you want auto-disable)")]
+    [Tooltip("If assigned, becomes interactable only when ≥1 unit is placed.")]
+    [SerializeField] private Button startBattleButton;
+    [Tooltip("If assigned, text updates to 'Place units first' when no units placed.")]
+    [SerializeField] private TMP_Text startBattleLabel;
+
     [Header("Card Colors")]
     [SerializeField] private Color normalColor = new Color(0.25f, 0.28f, 0.35f, 1f);
     [SerializeField] private Color selectedColor = new Color(1f, 0.85f, 0.15f, 1f);
 
     private readonly List<Button> spawnedCards = new();
-    private readonly Dictionary<Button, UnitInstance> cardToInstance = new();
     private UnitInstance selectedInstance;
-
-    // ==================================================================
-    //  LIFECYCLE
-    // ==================================================================
 
     private void OnEnable()
     {
         if (InventoryManager.Instance != null)
             InventoryManager.Instance.OnUnitsChanged += Refresh;
+        if (preparingController != null)
+            preparingController.OnCanStartBattleChanged += HandleCanStartChanged;
 
         Refresh();
+
+        // Initial button state
+        if (preparingController != null)
+            HandleCanStartChanged(preparingController.CanStartBattle);
     }
 
     private void OnDisable()
     {
         if (InventoryManager.Instance != null)
             InventoryManager.Instance.OnUnitsChanged -= Refresh;
+        if (preparingController != null)
+            preparingController.OnCanStartBattleChanged -= HandleCanStartChanged;
     }
-
-    // ==================================================================
-    //  REFRESH
-    // ==================================================================
 
     public void Refresh()
     {
-        // Clear old cards
         foreach (var b in spawnedCards)
             if (b != null) Destroy(b.gameObject);
         spawnedCards.Clear();
-        cardToInstance.Clear();
 
         if (InventoryManager.Instance == null || cardPrefab == null || cardContainer == null)
             return;
 
-        // If the selected instance was removed (placed on board, etc.), clear local selection
         if (selectedInstance != null && !InventoryManager.Instance.Units.Contains(selectedInstance))
         {
             selectedInstance = null;
-            if (preparingController != null) preparingController.CancelSelection();
+            preparingController?.CancelSelection();
         }
 
-        // Instantiate one card per inventory unit
         foreach (var inst in InventoryManager.Instance.Units)
         {
             if (inst == null || inst.definition == null) continue;
@@ -76,22 +69,18 @@ public class TestPreparingUI : MonoBehaviour
             var card = Instantiate(cardPrefab, cardContainer);
             card.gameObject.SetActive(true);
             spawnedCards.Add(card);
-            cardToInstance[card] = inst;
 
-            // Label: name + HP
             var label = card.GetComponentInChildren<TMP_Text>();
             if (label != null)
-                label.text = $"{inst.definition.unitName}\n{inst.currentHP} / {inst.maxHP} HP";
+                label.text = $"{inst.definition.unitName}\n{inst.currentHP}/{inst.maxHP}";
 
-            // Tint
             var img = card.GetComponent<Image>();
             if (img != null)
                 img.color = (inst == selectedInstance) ? selectedColor : normalColor;
 
-            // Click handler — capture the instance in a local so the closure is correct
-            var capturedInstance = inst;
+            var captured = inst;
             card.onClick.RemoveAllListeners();
-            card.onClick.AddListener(() => OnCardClicked(capturedInstance));
+            card.onClick.AddListener(() => OnCardClicked(captured));
         }
 
         if (emptyMessage != null)
@@ -102,16 +91,21 @@ public class TestPreparingUI : MonoBehaviour
     {
         if (selectedInstance == inst)
         {
-            // Click same card → deselect
             selectedInstance = null;
             preparingController?.CancelSelection();
         }
         else
         {
-            // Click new card → select
             selectedInstance = inst;
             preparingController?.SetSelectedInstance(inst);
         }
         Refresh();
+    }
+
+    private void HandleCanStartChanged(bool canStart)
+    {
+        if (startBattleButton != null) startBattleButton.interactable = canStart;
+        if (startBattleLabel != null)
+            startBattleLabel.text = canStart ? "Start Battle" : "Place units first";
     }
 }

@@ -9,9 +9,25 @@ public class InventoryManager : MonoBehaviour
     [Header("Config")]
     [SerializeField] private int baseUnitCap = 6;
 
-    // ===== Troops =====
-    private readonly List<UnitInstance> units = new();
+    // ★ NEW: Now visible in the Inspector! (Removed 'readonly' so you can edit it in the Inspector for testing)
+    [Header("Troops (Visible in Inspector)")]
+    [SerializeField] private List<UnitInstance> units = new();
     public IReadOnlyList<UnitInstance> Units => units;
+
+    // ★ NEW: A visual list for the Inspector, since Unity can't show Dictionaries
+    [System.Serializable]
+    public class ItemEntry
+    {
+        public string itemId;
+        public int count;
+    }
+
+    [Header("Items (For Testing in Inspector)")]
+    [SerializeField] private List<ItemEntry> startWithItems = new();
+
+    // The actual runtime dictionary (hidden from Inspector)
+    private readonly Dictionary<string, int> items = new();
+    public IReadOnlyDictionary<string, int> Items => items;
 
     // ===== Unit cap =====
     private int permanentCapBonus;
@@ -19,12 +35,22 @@ public class InventoryManager : MonoBehaviour
 
     // ===== Events =====
     public event Action OnUnitsChanged;
+    public event Action OnItemsChanged;
     public event Action<int> OnUnitCapChanged;
 
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+
+        // Load the starting items you added in the Inspector into the Dictionary
+        foreach (var entry in startWithItems)
+        {
+            if (!string.IsNullOrEmpty(entry.itemId) && entry.count > 0)
+            {
+                AddItem(entry.itemId, entry.count);
+            }
+        }
     }
 
     // ============================================================
@@ -98,17 +124,50 @@ public class InventoryManager : MonoBehaviour
     }
 
     // ============================================================
-    //  SAVE / LOAD (called by RunState)
+    //  ITEMS (Shop uses these methods)
     // ============================================================
-    // Note: Items are now handled by ItemManager, so we only save Units here.
-    public void RestoreFromRunState(List<UnitInstance> savedUnits, int savedCapBonus)
+
+    public void AddItem(string itemId, int count = 1)
+    {
+        if (string.IsNullOrEmpty(itemId) || count <= 0) return;
+        items.TryGetValue(itemId, out int cur);
+        items[itemId] = cur + count;
+        OnItemsChanged?.Invoke();
+    }
+
+    public bool RemoveItem(string itemId, int count = 1)
+    {
+        if (string.IsNullOrEmpty(itemId)) return false;
+        if (!items.TryGetValue(itemId, out int cur) || cur < count) return false;
+        cur -= count;
+        if (cur <= 0) items.Remove(itemId);
+        else items[itemId] = cur;
+        OnItemsChanged?.Invoke();
+        return true;
+    }
+
+    public int GetItemCount(string itemId)
+    {
+        return items.TryGetValue(itemId, out int c) ? c : 0;
+    }
+
+    // ============================================================
+    //  SAVE / LOAD
+    // ============================================================
+
+    public void RestoreFromRunState(List<UnitInstance> savedUnits, Dictionary<string, int> savedItems, int savedCapBonus)
     {
         units.Clear();
         if (savedUnits != null) units.AddRange(savedUnits);
 
+        items.Clear();
+        if (savedItems != null)
+            foreach (var kv in savedItems) items[kv.Key] = kv.Value;
+
         permanentCapBonus = Mathf.Max(0, savedCapBonus);
 
         OnUnitsChanged?.Invoke();
+        OnItemsChanged?.Invoke();
         OnUnitCapChanged?.Invoke(UnitCap);
     }
 }
