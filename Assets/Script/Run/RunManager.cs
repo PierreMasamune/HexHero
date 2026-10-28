@@ -9,9 +9,7 @@ public class RunManager : MonoBehaviour
     [SerializeField] private MapData mapData;
 
     [Header("Screen Roots")]
-    [Tooltip("Everything that belongs to the map screen.")]
     [SerializeField] private GameObject mapRoot;
-    [Tooltip("Everything that belongs to the battle scene (HexGridManager, TerrainRenderer, PreparingPanel, HUD).")]
     [SerializeField] private GameObject battleRoot;
 
     [Header("Map UI")]
@@ -30,10 +28,6 @@ public class RunManager : MonoBehaviour
 
     private IMapNodeController activeController;
     private string pendingNodeId;
-
-    // ==================================================================
-    //  LIFECYCLE
-    // ==================================================================
 
     private void Awake()
     {
@@ -58,28 +52,14 @@ public class RunManager : MonoBehaviour
         ShowMap();
     }
 
-    // ==================================================================
-    //  EDITOR / CONTEXT MENU UTILITY
-    // ==================================================================
-
     [ContextMenu("Reset Run (Delete Save & Reset State)")]
     public void ResetRunFromEditor()
     {
         SaveSystem.DeleteSave();
         State = new RunState();
-
-        Debug.Log("[RunManager] Run has been reset. State wiped.");
-
-        if (Application.isPlaying)
-        {
-            // If we are in Play mode, reload the scene to fully restart everything
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-        }
+        Debug.Log("[RunManager] Run has been reset.");
+        if (Application.isPlaying) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
-
-    // ==================================================================
-    //  MAP LOGIC
-    // ==================================================================
 
     public void ShowMap()
     {
@@ -102,7 +82,7 @@ public class RunManager : MonoBehaviour
 
         if (mapRoot != null) mapRoot.SetActive(false);
 
-        // ★ Only turn on the battle scene if this is a Fight or Boss node!
+        // Only show battle root for Fight or Boss nodes
         bool isBattleNode = (node.type == MapNodeType.Fight || node.type == MapNodeType.Boss);
         if (battleRoot != null) battleRoot.SetActive(isBattleNode);
 
@@ -147,6 +127,10 @@ public class RunManager : MonoBehaviour
             State.visitedMapNodeIds.Add(nodeId);
 
         State.currentMapNodeId = nodeId;
+
+        // Increment depth for progression tracking
+        State.runDepth++;
+
         pendingNodeId = null;
 
         SaveSystem.Save(State);
@@ -176,31 +160,5 @@ public class RunManager : MonoBehaviour
     {
         if (activeController == null) return;
         activeController.RaiseComplete(result);
-    }
-
-    // ==================================================================
-    //  DEBUG TOOLS
-    // ==================================================================
-
-    [ContextMenu("DEBUG: Reset Map Progress Only")]
-    public void DebugResetMapProgress()
-    {
-        // 1. Clear all the nodes you've visited
-        State.visitedMapNodeIds.Clear();
-
-        // 2. Send the player back to the start
-        State.currentMapNodeId = "";
-
-        // 3. Revive the run if you had previously lost
-        State.isRunOver = false;
-
-        // 4. Save the modified state back to the file
-        SaveSystem.Save(State);
-
-        // 5. Hide the Game Over screen and redraw the map
-        if (runOverRoot != null) runOverRoot.SetActive(false);
-        ShowMap();
-
-        Debug.Log("[RunManager] DEBUG: Map progress cleared! Map layout preserved.");
     }
 }

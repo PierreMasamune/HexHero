@@ -72,6 +72,18 @@ public class HexTerrainMap : MonoBehaviour
         }
     }
 
+    public void ApplyTerrainLayout(List<TerrainCellEntry> newLayout)
+    {
+        ClearAll();
+        if (newLayout == null) return;
+
+        foreach (var entry in newLayout)
+        {
+            SetTerrain(entry.cell, entry.terrain);
+        }
+        Rebuild();
+    }
+
     public void ClearAll()
     {
         painted.Clear();

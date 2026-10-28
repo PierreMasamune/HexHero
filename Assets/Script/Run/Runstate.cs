@@ -2,10 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// The single source of truth for a run. Serialized by SaveSystem.
-/// Populated by EconomyManager, InventoryManager, BuffManager (Slice 3), MapController (Slice 4).
-/// </summary>
 [Serializable]
 public class RunState
 {
@@ -28,21 +24,16 @@ public class RunState
     public List<ItemStack> items = new();
 
     [Header("Buffs")]
-    public List<string> activeBuffIds = new();  // populated in Slice 3
+    public List<string> activeBuffIds = new();
 
     [Header("Map Progress")]
-    [Tooltip("ID of the last completed map node. Empty = start of run.")]
     public string currentMapNodeId = "";
     public List<string> visitedMapNodeIds = new();
     public int runDepth = 0;
 
-
-
     [Header("Flags")]
     public bool isRunOver = false;
     public bool isVictory = false;
-
-    // ---- helpers ----
 
     public RunState Clone()
     {

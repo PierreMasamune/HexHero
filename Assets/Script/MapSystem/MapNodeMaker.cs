@@ -7,10 +7,14 @@ public class MapNodeMarker : MonoBehaviour
     public string id;
     public MapNodeType type;
     public int chapter = 1;
+
+    // ★ NEW: Manually change the tier of the fight here!
+    [Tooltip("Tier 1 = Easy, Tier 2 = Medium, Tier 3 = Hard. Determines which fight is picked.")]
+    public int tier = 1;
+
     public string label;
 
     [Header("Connections")]
-    [Tooltip("Nodes this one leads to. Drag other MapNodeMarkers here.")]
     public List<MapNodeMarker> children = new();
 
     private void OnDrawGizmos()
@@ -27,8 +31,9 @@ public class MapNodeMarker : MonoBehaviour
         }
 
 #if UNITY_EDITOR
+        string displayTier = type == MapNodeType.Fight ? $" (T{tier})" : "";
         UnityEditor.Handles.Label(transform.position + Vector3.up * 0.4f,
-            string.IsNullOrEmpty(label) ? $"{type}\n({id})" : $"{label}\n({id})");
+            string.IsNullOrEmpty(label) ? $"{type}{displayTier}\n({id})" : $"{label}\n({id})");
 #endif
     }
 
