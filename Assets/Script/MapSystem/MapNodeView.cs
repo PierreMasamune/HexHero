@@ -31,7 +31,7 @@ public class MapNodeView : MonoBehaviour
 
     private System.Action<string> onClick;
 
-    public void Bind(MapNodeData node, MapNodeState state, System.Action<string> clickHandler)
+    public void Bind(MapNodeData node, MapNodeState state, bool isInteractable, System.Action<string> clickHandler)
     {
         NodeId = node.id;
         Type = node.type;
@@ -63,7 +63,7 @@ public class MapNodeView : MonoBehaviour
 
         if (button != null)
         {
-            button.interactable = state == MapNodeState.Available;
+            button.interactable = isInteractable && (state == MapNodeState.Available);
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener(HandleClick);
         }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class EconomyManager : MonoBehaviour
@@ -11,6 +10,12 @@ public class EconomyManager : MonoBehaviour
 
     public int Money { get; private set; }
 
+    // ★ NEW: Snapshot of money before the battle starts
+    public int StartOfBattleMoney { get; private set; }
+
+    public int LastBattleKillGold { get; private set; }
+    public int LastBattleAbilityGold { get; private set; }
+
     public event Action<int> OnMoneyChanged;
     public event Action<int> OnMoneyEarned;
     public event Action<int> OnMoneySpent;
@@ -19,15 +24,31 @@ public class EconomyManager : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
-        Money = startingMoney;
     }
 
     private void Start()
     {
+        if (RunManager.Instance != null && RunManager.Instance.State != null)
+        {
+            // 1. Try to load the money from the save file
+            Money = RunManager.Instance.State.money;
+
+            // 2. If it's a brand new game (money is 0 and no nodes visited yet), give the starting money!
+            if (Money == 0 && RunManager.Instance.State.visitedMapNodeIds.Count == 0)
+            {
+                Money = startingMoney;
+                RunManager.Instance.State.money = Money; // Sync it to the RunState so it saves correctly
+            }
+        }
+        else
+        {
+            Money = startingMoney;
+        }
+
+        OnMoneyChanged?.Invoke(Money);
+
         if (StatsManager.Instance != null)
             StatsManager.Instance.OnKill += HandleKill;
-        else
-            Debug.LogWarning("[EconomyManager] StatsManager.Instance is null — kill rewards disabled.");
     }
 
     private void OnDestroy()
@@ -37,25 +58,26 @@ public class EconomyManager : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
-    // ==================================================================
-    //  PUBLIC API
-    // ==================================================================
-
-    public void Earn(int amount)
+    public void Earn(int amount, bool isKillGold = false, bool isAbilityGold = false)
     {
         if (amount <= 0) return;
         Money += amount;
+
+        if (isKillGold) LastBattleKillGold += amount;
+        if (isAbilityGold) LastBattleAbilityGold += amount;
+
+        UpdateRunState();
         OnMoneyChanged?.Invoke(Money);
         OnMoneyEarned?.Invoke(amount);
     }
-
-    public bool CanAfford(int amount) => Money >= amount;
 
     public bool TrySpend(int amount)
     {
         if (amount <= 0) return true;
         if (Money < amount) return false;
+
         Money -= amount;
+        UpdateRunState();
         OnMoneyChanged?.Invoke(Money);
         OnMoneySpent?.Invoke(amount);
         return true;
@@ -64,76 +86,55 @@ public class EconomyManager : MonoBehaviour
     public void SetMoney(int amount)
     {
         Money = Mathf.Max(0, amount);
+        UpdateRunState();
         OnMoneyChanged?.Invoke(Money);
     }
 
-    public bool TryPayUpkeepForAdvance()
+    private void UpdateRunState()
     {
-        int upkeep = InventoryManager.Instance != null ? InventoryManager.Instance.TotalUpkeep() : 0;
-        if (upkeep <= 0) return true;
-        return TrySpend(upkeep);
+        if (RunManager.Instance != null && RunManager.Instance.State != null)
+            RunManager.Instance.State.money = Money;
     }
 
     // ==================================================================
-    //  KILL REWARDS
+    //  BATTLE TRACKERS
     // ==================================================================
+
+    public void ResetBattleTrackers()
+    {
+        // ★ Take a snapshot of money when the battle starts
+        StartOfBattleMoney = Money;
+        LastBattleKillGold = 0;
+        LastBattleAbilityGold = 0;
+    }
 
     private void HandleKill(Unit killer, Unit victim)
     {
         if (killer == null || victim == null) return;
 
-        // Enemy kill reward — any player unit killing any enemy unit
-        if (killer.Faction == Faction.Player
-            && victim.Faction == Faction.Enemy
-            && victim.Definition != null
-            && victim.Definition.killReward > 0)
+        if (killer.Faction == Faction.Player && victim.Faction == Faction.Enemy && victim.Definition != null)
         {
-            Earn(victim.Definition.killReward);
-            Debug.Log($"[Economy] +{victim.Definition.killReward}g (killed {victim.UnitName})");
-        }
+            if (victim.Definition.killReward > 0)
+                Earn(victim.Definition.killReward, isKillGold: true);
 
-        // Chieftain extra gold per kill
-        if (killer.Faction == Faction.Player
-            && killer.Definition != null
-            && killer.Definition.ability == SpecialAbility.ExtraGoldPerKill
-            && killer.Definition.abilityValue > 0)
-        {
-            Earn(killer.Definition.abilityValue);
-            Debug.Log($"[Economy] +{killer.Definition.abilityValue}g " +
-                      $"({killer.UnitName} kill bonus)");
+            if (killer.Definition != null && killer.Definition.ability == SpecialAbility.ExtraGoldPerKill)
+                Earn(killer.Definition.abilityValue, isAbilityGold: true);
         }
     }
 
-    // ==================================================================
-    //  BATTLE-END REWARDS
-    // ==================================================================
-
-    /// <summary>
-    /// Sums ExtraGoldPerBattle / ExtraGoldPerTurn abilityValue across surviving
-    /// player units and awards it. Called on victory only — defeat ends the run.
-    /// </summary>
-    public void AwardBattleEndGold(IEnumerable<Unit> playerUnits)
+    public void AwardBattleEndGold(System.Collections.Generic.IEnumerable<Unit> playerUnits)
     {
         if (playerUnits == null) return;
 
         int total = 0;
         foreach (var u in playerUnits)
         {
-            if (u == null || !u.IsAlive) continue;
-            if (u.Definition == null) continue;
-
-            if (u.Definition.ability == SpecialAbility.ExtraGoldPerBattle
-                || u.Definition.ability == SpecialAbility.ExtraGoldPerTurn)
-            {
+            if (u == null || !u.IsAlive || u.Definition == null) continue;
+            if (u.Definition.ability == SpecialAbility.ExtraGoldPerBattle || u.Definition.ability == SpecialAbility.ExtraGoldPerTurn)
                 total += u.Definition.abilityValue;
-                Debug.Log($"[Economy] {u.UnitName} grants +{u.Definition.abilityValue}g at battle end.");
-            }
         }
 
         if (total > 0)
-        {
-            Earn(total);
-            Debug.Log($"[Economy] Battle-end total: +{total}g");
-        }
+            Earn(total, isAbilityGold: true);
     }
 }

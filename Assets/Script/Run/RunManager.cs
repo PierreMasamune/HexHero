@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
 
 public class RunManager : MonoBehaviour
 {
@@ -11,9 +12,11 @@ public class RunManager : MonoBehaviour
     [Header("Screen Roots")]
     [SerializeField] private GameObject mapRoot;
     [SerializeField] private GameObject battleRoot;
+    [SerializeField] private GameObject battleHUD;
 
     [Header("Map UI")]
     [SerializeField] private MapController mapController;
+    [SerializeField] private Transform mapTextSpawnParent;
 
     [Header("Node Controllers")]
     [SerializeField] private FightNodeController fightController;
@@ -37,12 +40,10 @@ public class RunManager : MonoBehaviour
         if (SaveSystem.TryLoad(out RunState loaded))
         {
             State = loaded;
-            Debug.Log("[RunManager] Loaded existing run.");
         }
         else
         {
             State = new RunState();
-            Debug.Log("[RunManager] New run created.");
         }
     }
 
@@ -52,13 +53,12 @@ public class RunManager : MonoBehaviour
         ShowMap();
     }
 
-    [ContextMenu("Reset Run (Delete Save & Reset State)")]
-    public void ResetRunFromEditor()
+    private void Update()
     {
-        SaveSystem.DeleteSave();
-        State = new RunState();
-        Debug.Log("[RunManager] Run has been reset.");
-        if (Application.isPlaying) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        if (Keyboard.current != null && Keyboard.current.mKey.wasPressedThisFrame)
+        {
+            ToggleMapOverlay();
+        }
     }
 
     public void ShowMap()
@@ -66,11 +66,27 @@ public class RunManager : MonoBehaviour
         HideAllNodeControllers();
 
         if (mapRoot != null) mapRoot.SetActive(true);
-        if (battleRoot != null) battleRoot.SetActive(false);
         if (runOverRoot != null) runOverRoot.SetActive(false);
 
+        if (battleRoot != null) battleRoot.SetActive(true);
+        if (battleHUD != null) battleHUD.SetActive(false);
+
         if (mapController != null)
-            mapController.Refresh(mapData, State, OnNodeClicked);
+            mapController.Refresh(mapData, State, true, OnNodeClicked);
+    }
+
+    public void ToggleMapOverlay()
+    {
+        bool isMapOpen = mapRoot.activeSelf;
+        mapRoot.SetActive(!isMapOpen);
+
+        if (battleHUD != null) battleHUD.SetActive(isMapOpen);
+
+        if (!isMapOpen)
+        {
+            if (mapController != null)
+                mapController.Refresh(mapData, State, false, OnNodeClicked);
+        }
     }
 
     private void OnNodeClicked(string nodeId)
@@ -81,18 +97,10 @@ public class RunManager : MonoBehaviour
         pendingNodeId = nodeId;
 
         if (mapRoot != null) mapRoot.SetActive(false);
-
-        // Only show battle root for Fight or Boss nodes
-        bool isBattleNode = (node.type == MapNodeType.Fight || node.type == MapNodeType.Boss);
-        if (battleRoot != null) battleRoot.SetActive(isBattleNode);
+        if (battleHUD != null) battleHUD.SetActive(true);
 
         activeController = GetControllerFor(node.type);
-        if (activeController == null)
-        {
-            Debug.LogWarning($"[RunManager] No controller for node type {node.type}. Skipping.");
-            CompleteNode(nodeId, MapNodeResult.Success);
-            return;
-        }
+        if (activeController == null) return;
 
         activeController.OnComplete += HandleNodeComplete;
         activeController.Enter(node, State);
@@ -127,12 +135,21 @@ public class RunManager : MonoBehaviour
             State.visitedMapNodeIds.Add(nodeId);
 
         State.currentMapNodeId = nodeId;
-
-        // Increment depth for progression tracking
         State.runDepth++;
 
-        pendingNodeId = null;
+        // ★ DEDUCT UPKEEP HERE (After battle cleanup, when units are back in inventory)
+        int upkeep = InventoryManager.Instance.TotalUpkeep();
+        if (upkeep > 0 && EconomyManager.Instance != null)
+        {
+            EconomyManager.Instance.TrySpend(upkeep);
 
+            if (mapTextSpawnParent != null)
+            {
+                FloatingMapText.Spawn(mapTextSpawnParent, Vector2.zero, $"-${upkeep}", Color.red);
+            }
+        }
+
+        pendingNodeId = null;
         SaveSystem.Save(State);
         ShowMap();
     }
@@ -152,13 +169,22 @@ public class RunManager : MonoBehaviour
         SaveSystem.Save(State);
 
         if (mapRoot != null) mapRoot.SetActive(false);
-        if (battleRoot != null) battleRoot.SetActive(false);
+        if (battleHUD != null) battleHUD.SetActive(false);
         if (runOverRoot != null) runOverRoot.SetActive(true);
+        if (battleRoot != null) battleRoot.SetActive(true);
     }
 
     public void CompleteActiveNode(MapNodeResult result)
     {
         if (activeController == null) return;
         activeController.RaiseComplete(result);
+    }
+
+    [ContextMenu("Reset Run (Delete Save & Reset State)")]
+    public void ResetRunFromEditor()
+    {
+        SaveSystem.DeleteSave();
+        State = new RunState();
+        if (Application.isPlaying) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

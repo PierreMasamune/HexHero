@@ -22,28 +22,28 @@ MonoBehaviour:
     - Buff4
     - Shop4
     label: 
-  - id: Fight6
+  - id: Fight 2
+    type: 1
+    chapter: 1
+    tier: 1
+    position: {x: 352, y: -317.00003}
+    children:
+    - Fight3
+    - Shop2
+    label: 
+  - id: Buff4
+    type: 3
+    chapter: 1
+    tier: 2
+    position: {x: -370.99997, y: 508.99997}
+    children:
+    - Boss_Chapter_1
+    label: 
+  - id: Fight5
     type: 1
     chapter: 1
     tier: 2
-    position: {x: -565, y: 102}
-    children:
-    - Buff4
-    label: 
-  - id: Fight 2
-    type: 3
-    chapter: 1
-    tier: 1
-    position: {x: -98.99999, y: -100.00002}
-    children:
-    - Fight3
-    - Fight4
-    label: 
-  - id: Shop4
-    type: 2
-    chapter: 1
-    tier: 2
-    position: {x: 9.00001, y: 508.99997}
+    position: {x: 333.00003, y: 504.99997}
     children:
     - Boss_Chapter_1
     label: 
@@ -55,14 +55,13 @@ MonoBehaviour:
     children:
     - Fight5
     label: 
-  - id: Fight1
+  - id: Fight6
     type: 1
     chapter: 1
-    tier: 1
-    position: {x: -184.99998, y: -503.00003}
+    tier: 2
+    position: {x: -565, y: 102}
     children:
-    - Shop1
-    - Fight 2
+    - Buff4
     label: 
   - id: Start
     type: 0
@@ -73,13 +72,13 @@ MonoBehaviour:
     - Fight1
     - Buff1
     label: 
-  - id: Buff4
-    type: 3
+  - id: Fight3
+    type: 1
     chapter: 1
     tier: 2
-    position: {x: -370.99997, y: 508.99997}
+    position: {x: 239.00002, y: -72.00003}
     children:
-    - Boss_Chapter_1
+    - Buff3
     label: 
   - id: Boss_Chapter_1
     type: 4
@@ -88,22 +87,23 @@ MonoBehaviour:
     position: {x: 15.00001, y: 703}
     children: []
     label: 
-  - id: Fight5
-    type: 1
+  - id: Shop4
+    type: 2
     chapter: 1
     tier: 2
-    position: {x: 333.00003, y: 504.99997}
+    position: {x: 9.00001, y: 508.99997}
     children:
     - Boss_Chapter_1
     label: 
-  - id: Shop1
-    type: 2
+  - id: Fight1
+    type: 1
     chapter: 1
     tier: 1
-    position: {x: -408.99997, y: -291.00003}
+    position: {x: -184.99998, y: -503.00003}
     children:
-    - Fight4
-    - Fight6
+    - Shop1
+    - Buff2
+    - Fight1B
     label: 
   - id: Buff3
     type: 3
@@ -114,22 +114,21 @@ MonoBehaviour:
     - Shop4
     - Fight5
     label: 
-  - id: Fight3
-    type: 1
+  - id: Shop1
+    type: 2
     chapter: 1
-    tier: 2
-    position: {x: 239.00002, y: -72.00003}
+    tier: 1
+    position: {x: -408.99997, y: -291.00003}
     children:
-    - Buff3
+    - Fight4
+    - Fight6
     label: 
-  - id: Fight 2
+  - id: Fight1B
     type: 1
     chapter: 1
     tier: 1
-    position: {x: 352, y: -317.00003}
-    children:
-    - Fight3
-    - Shop2
+    position: {x: 49.00001, y: -330.00003}
+    children: []
     label: 
   - id: Buff1
     type: 3
@@ -138,4 +137,13 @@ MonoBehaviour:
     position: {x: 215.00002, y: -503.00003}
     children:
     - Fight 2
+    label: 
+  - id: Buff2
+    type: 3
+    chapter: 1
+    tier: 1
+    position: {x: -98.99999, y: -100.00002}
+    children:
+    - Fight3
+    - Fight4
     label: 

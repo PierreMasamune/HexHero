@@ -120,4 +120,4 @@ public class CurvedHealthBar : MaskableGraphic
         vh.AddTriangle(startIndex, startIndex + 1, startIndex + 2);
         vh.AddTriangle(startIndex, startIndex + 2, startIndex + 3);
     }
-}
+}   

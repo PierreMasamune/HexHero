@@ -6,10 +6,12 @@ public class MapController : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private MapNodeView nodePrefab;
-    [SerializeField] private RectTransform nodeContainer;   // where nodes instantiate
+    [SerializeField] private RectTransform nodeContainer;
+    [SerializeField] private ScrollRect scrollRect;      // ★ NEW: Drag the Scroll View here
+    [SerializeField] private RectTransform viewportRect;    // ★ NEW: Drag the Viewport here
 
     [Header("Connection Lines")]
-    [SerializeField] private Image linePrefab;            // simple 1×1 image
+    [SerializeField] private Image linePrefab;
     [SerializeField] private Color lineVisitedColor = new Color(0.4f, 0.9f, 0.4f, 0.7f);
     [SerializeField] private Color lineAvailableColor = new Color(1f, 1f, 1f, 0.85f);
     [SerializeField] private Color lineLockedColor = new Color(0.4f, 0.4f, 0.4f, 0.4f);
@@ -18,30 +20,26 @@ public class MapController : MonoBehaviour
     private MapData mapData;
     private RunState runState;
     private System.Action<string> onNodeClicked;
+    private bool isInteractable = true;
 
     private readonly List<MapNodeView> views = new();
     private readonly List<Image> lines = new();
 
-    // ==================================================================
-    //  PUBLIC
-    // ==================================================================
-
-    public void Refresh(MapData data, RunState state, System.Action<string> onNodeClick)
+    // ★ Updated signature with bool isInteractable
+    public void Refresh(MapData data, RunState state, bool interactable, System.Action<string> onNodeClick)
     {
         mapData = data;
         runState = state;
         onNodeClicked = onNodeClick;
+        isInteractable = interactable;
 
         Clear();
-
         if (mapData == null) return;
 
-        // Determine available node IDs
         var available = ComputeAvailableNodes(state);
         var visited = new HashSet<string>(state.visitedMapNodeIds);
         string current = state.currentMapNodeId;
 
-        // Instantiate node views
         foreach (var node in mapData.nodes)
         {
             var stateForNode =
@@ -52,11 +50,12 @@ public class MapController : MonoBehaviour
 
             var view = Instantiate(nodePrefab, nodeContainer);
             view.GetComponent<RectTransform>().anchoredPosition = node.position;
-            view.Bind(node, stateForNode, onNodeClicked);
+
+            // Pass the interactable state to the view
+            view.Bind(node, stateForNode, isInteractable, onNodeClicked);
             views.Add(view);
         }
 
-        // Draw connections
         foreach (var node in mapData.nodes)
         {
             foreach (var childId in node.children)
@@ -76,6 +75,33 @@ public class MapController : MonoBehaviour
                 DrawLine(node.position, child.position, c);
             }
         }
+
+        // ★ Auto-scroll to the current node
+        if (!string.IsNullOrEmpty(current))
+            CenterOnNode(current);
+        else
+            CenterOnNode(mapData.GetStartNode()?.id);
+    }
+
+    private void CenterOnNode(string nodeId)
+    {
+        if (scrollRect == null || viewportRect == null) return;
+
+        var node = mapData.Get(nodeId);
+        if (node == null) return;
+
+        // Calculate normalized position (0 to 1) based on container size
+        Vector2 contentSize = nodeContainer.rect.size;
+        Vector2 viewSize = viewportRect.rect.size;
+
+        float normX = (node.position.x + contentSize.x * 0.5f) / contentSize.x;
+        float normY = (node.position.y + contentSize.y * 0.5f) / contentSize.y;
+
+        // Clamp so we don't scroll past the edges
+        normX = Mathf.Clamp01(normX);
+        normY = Mathf.Clamp01(normY);
+
+        scrollRect.normalizedPosition = new Vector2(normX, normY);
     }
 
     private void Clear()
@@ -86,18 +112,11 @@ public class MapController : MonoBehaviour
         lines.Clear();
     }
 
-    // ==================================================================
-    //  LOGIC
-    // ==================================================================
-
-    /// <summary>Which nodes can the player click right now?</summary>
     private HashSet<string> ComputeAvailableNodes(RunState state)
     {
         var result = new HashSet<string>();
-
         if (string.IsNullOrEmpty(state.currentMapNodeId))
         {
-            // Start of the run: expose root nodes or the children of the Start node.
             var start = mapData.GetStartNode();
             if (start != null)
             {
@@ -110,18 +129,12 @@ public class MapController : MonoBehaviour
         }
         else
         {
-            // Children of the current node become available
             var cur = mapData.Get(state.currentMapNodeId);
             if (cur != null)
                 foreach (var c in cur.children) result.Add(c);
         }
-
         return result;
     }
-
-    // ==================================================================
-    //  LINE DRAWING
-    // ==================================================================
 
     private void DrawLine(Vector2 a, Vector2 b, Color color)
     {

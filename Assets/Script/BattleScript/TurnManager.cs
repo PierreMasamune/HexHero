@@ -21,8 +21,6 @@ public class TurnManager : MonoBehaviour
     [SerializeField] private List<Unit> enemyUnits = new();
 
     [Header("Preparing Stage")]
-    [Tooltip("When true, TurnManager waits for PreparingController to call BeginNewBattle(). " +
-             "If no PreparingController is in the scene, this is bypassed with a warning.")]
     [SerializeField] private bool requiresPreparingStage = true;
 
     [Header("AI Timing")]
@@ -55,18 +53,12 @@ public class TurnManager : MonoBehaviour
     public int TurnNumber { get; private set; }
     public TurnState CurrentState { get; private set; }
     public bool IsPlayerTurn => CurrentState == TurnState.PlayerTurn;
-    public bool IsRunning => gameLoopRunning;
-    public bool RequiresPreparing => requiresPreparingStage;
 
     private bool nextTurnRequested;
     private bool popupOpen;
     private bool gameLoopRunning;
     private int lastCanAct = -1;
     private int lastAlive = -1;
-
-    // ==================================================================
-    //  LIFECYCLE
-    // ==================================================================
 
     private void Awake()
     {
@@ -82,11 +74,9 @@ public class TurnManager : MonoBehaviour
         if (grid == null) Debug.LogError("[TurnManager] 'grid' is not assigned!");
 
         foreach (var u in playerUnits)
-            if (u != null && grid != null)
-                grid.RegisterUnit(u, grid.WorldToCell(u.transform.position));
+            if (u != null && grid != null) grid.RegisterUnit(u, grid.WorldToCell(u.transform.position));
         foreach (var u in enemyUnits)
-            if (u != null && grid != null)
-                grid.RegisterUnit(u, grid.WorldToCell(u.transform.position));
+            if (u != null && grid != null) grid.RegisterUnit(u, grid.WorldToCell(u.transform.position));
 
         if (grid != null) grid.OnUnitDied += HandleUnitDied;
 
@@ -96,20 +86,10 @@ public class TurnManager : MonoBehaviour
         if (requiresPreparingStage)
         {
             var prep = FindAnyObjectByType<PreparingController>();
-            if (prep == null)
-            {
-                Debug.LogWarning("[TurnManager] requiresPreparingStage=true but no PreparingController found. Auto-starting battle.");
-                BeginNewBattle();
-            }
-            else
-            {
-                SetState(TurnState.Preparing);
-            }
+            if (prep == null) BeginNewBattle();
+            else SetState(TurnState.Preparing);
         }
-        else
-        {
-            BeginNewBattle();
-        }
+        else BeginNewBattle();
     }
 
     private void OnDestroy()
@@ -127,23 +107,11 @@ public class TurnManager : MonoBehaviour
         }
     }
 
-    // ==================================================================
-    //  PUBLIC — begin battle (called by PreparingController)
-    // ==================================================================
-
     public void BeginNewBattle()
     {
-        if (gameLoopRunning)
-        {
-            Debug.LogWarning("[TurnManager] BeginNewBattle called but a battle is already running.");
-            return;
-        }
+        if (gameLoopRunning) return;
         StartCoroutine(GameLoop());
     }
-
-    // ==================================================================
-    //  UNIT REGISTRY
-    // ==================================================================
 
     public void RegisterSpawnedUnit(Unit unit)
     {
@@ -174,11 +142,12 @@ public class TurnManager : MonoBehaviour
         playerUnits.Remove(unit);
         enemyUnits.Remove(unit);
         RefreshUnitsUI();
-    }
 
-    // ==================================================================
-    //  BUTTON HANDLERS
-    // ==================================================================
+        if (CurrentState == TurnState.PlayerTurn || CurrentState == TurnState.EnemyTurn)
+        {
+            CheckBattleEnd();
+        }
+    }
 
     public void NextTurnButtonPressed()
     {
@@ -201,14 +170,13 @@ public class TurnManager : MonoBehaviour
     public void ConfirmEndTurn() { popupOpen = false; nextTurnRequested = true; }
     public void CancelEndTurn() { popupOpen = false; }
 
-    // ==================================================================
-    //  MAIN LOOP
-    // ==================================================================
-
     private IEnumerator GameLoop()
     {
         gameLoopRunning = true;
         SetTurnNumber(1);
+
+        if (EconomyManager.Instance != null)
+            EconomyManager.Instance.ResetBattleTrackers();
 
         while (true)
         {
@@ -242,10 +210,6 @@ public class TurnManager : MonoBehaviour
         }
     }
 
-    // ==================================================================
-    //  PASSIVES + AI + END (unchanged from Slice 1.5.5)
-    // ==================================================================
-
     private void ApplyStartOfTurnPassives(List<Unit> units)
     {
         if (units == null) return;
@@ -255,11 +219,7 @@ public class TurnManager : MonoBehaviour
             if (u.Definition.ability == SpecialAbility.SelfHeal)
             {
                 int heal = Mathf.Max(1, u.Attack / 2);
-                int before = u.CurrentHP;
                 u.Heal(heal);
-                if (u.CurrentHP > before)
-                    Debug.Log($"[Passive] {u.UnitName} self-healed +{u.CurrentHP - before} HP " +
-                              $"({u.CurrentHP}/{u.MaxHP})");
             }
         }
     }
@@ -347,17 +307,29 @@ public class TurnManager : MonoBehaviour
             anyEnemyAlive = true; break;
         }
 
-        if (!anyPlayerAlive) { EndGame(TurnState.Defeat); Debug.Log("=== DEFEAT ==="); return true; }
-        if (!anyEnemyAlive) { EndGame(TurnState.Victory); Debug.Log("=== VICTORY ==="); return true; }
+        if (!anyPlayerAlive) { EndGame(TurnState.Defeat); return true; }
+        if (!anyEnemyAlive) { EndGame(TurnState.Victory); return true; }
         return false;
     }
 
     private void EndGame(TurnState endState)
     {
-        SetState(endState);
         SetNextTurnButtonInteractable(false);
         if (stopPlayerInputOnGameEnd && selector != null) selector.EnableInput(false);
 
+        // ★ Start a routine to clean up minions FIRST, then set the Victory state
+        StartCoroutine(EndGameRoutine(endState));
+    }
+
+    private IEnumerator EndGameRoutine(TurnState endState)
+    {
+        // 1. Cleanup the minions and wait for them to vanish
+        yield return StartCoroutine(CleanupTransientUnitsRoutine());
+
+        // 2. Now set the state (This triggers the Victory UI in PreparingController)
+        SetState(endState);
+
+        // 3. Fire the UnityEvents
         if (endState == TurnState.Victory)
         {
             if (EconomyManager.Instance != null)
@@ -368,8 +340,6 @@ public class TurnManager : MonoBehaviour
         {
             onDefeat?.Invoke();
         }
-
-        StartCoroutine(CleanupTransientUnitsRoutine());
     }
 
     private IEnumerator CleanupTransientUnitsRoutine()

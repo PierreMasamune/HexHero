@@ -15,7 +15,7 @@ public class FloatingDamageText : MonoBehaviour
         GameObject prefab = Resources.Load<GameObject>("Prefabs/DamageText");
         if (prefab == null)
         {
-            Debug.LogError("Missing DamageText prefab in Resources/Prefabs/");
+            Debug.LogError("Missing DamageText prefab in Resources/Prefabs/");  
             return;
         }
 

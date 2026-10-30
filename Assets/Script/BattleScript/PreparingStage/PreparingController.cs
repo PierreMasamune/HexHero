@@ -11,25 +11,20 @@ public class PreparingController : MonoBehaviour
     [SerializeField] private HexSelector selector;
     [SerializeField] private HexHighlightManager highlight;
     [SerializeField] private Camera cam;
+    [SerializeField] private VictoryScreenUI victoryScreen;
 
     [Header("Preparing UI")]
-    [Tooltip("The whole preparing canvas. Shown/hidden when entering/leaving preparing.")]
     [SerializeField] private GameObject preparingRoot;
 
     [Header("Placement Zone (Radius)")]
-    [Tooltip("The center hex of the placement circle. (0,0) is the middle of the board.")]
     [SerializeField] private HexCoord placementZoneCenter = new HexCoord(-2, 0);
-    [Tooltip("How many hexes out from the center can the player place units?")]
     [SerializeField] private int placementZoneRadius = 2;
 
     [Header("King Auto-Placement")]
     [SerializeField] private bool autoPlaceKing = true;
     [SerializeField] private HexCoord preferredKingCell = new HexCoord(-2, 0);
 
-    // ★ NEW: The Inspector list you asked for!
     [Header("Manual Enemy Setup (For Testing)")]
-    [Tooltip("If you put enemies here, they will override the FightDefinition and spawn exactly where you say. " +
-             "Leave this empty to use the handcrafted enemies from the map node's FightDefinition.")]
     [SerializeField] private List<SpawnEntry> manualEnemySetup = new();
 
     [Header("Debug Options")]
@@ -59,6 +54,7 @@ public class PreparingController : MonoBehaviour
 
         if (turnManager != null) turnManager.OnStateChanged += HandleTurnStateChanged;
         if (preparingRoot != null) preparingRoot.SetActive(false);
+        if (victoryScreen != null) victoryScreen.gameObject.SetActive(false);
     }
 
     private void OnDestroy()
@@ -78,10 +74,6 @@ public class PreparingController : MonoBehaviour
         else
             CancelSelection();
     }
-
-    // ==================================================================
-    //  BATTLE LOADING
-    // ==================================================================
 
     public void LoadBattle(FightDefinition battle)
     {
@@ -103,21 +95,10 @@ public class PreparingController : MonoBehaviour
 
         if (preSpawnEnemiesDuringPreparation)
         {
-            // ★ CHECK: Use manual list if it has items, otherwise use the map's FightDefinition
             if (manualEnemySetup != null && manualEnemySetup.Count > 0)
-            {
-                Debug.Log("[Preparing] Using MANUAL enemy setup from the Inspector.");
                 SpawnEnemiesFromSetup(manualEnemySetup);
-            }
             else if (activeBattle != null && activeBattle.enemies != null)
-            {
-                Debug.Log("[Preparing] Using handcrafted enemies from FightDefinition.");
                 SpawnEnemiesFromSetup(activeBattle.enemies);
-            }
-            else
-            {
-                Debug.LogWarning("[Preparing] No enemies found in manual list OR FightDefinition.");
-            }
         }
 
         if (showPlacementOutlines && highlight != null)
@@ -138,17 +119,9 @@ public class PreparingController : MonoBehaviour
         foreach (var cell in candidates)
         {
             if (!grid.Contains(cell) || grid.GetUnit(cell) != null) continue;
-            if (TryPlaceUnit(king, cell, silent: true))
-            {
-                Debug.Log($"[Preparing] Auto-placed King at {cell}.");
-                return;
-            }
+            if (TryPlaceUnit(king, cell, silent: true)) return;
         }
     }
-
-    // ==================================================================
-    //  SELECTION & BUTTONS
-    // ==================================================================
 
     public void SetSelectedInstance(UnitInstance instance)
     {
@@ -173,11 +146,7 @@ public class PreparingController : MonoBehaviour
 
     public void StartBattleClicked()
     {
-        if (deployed.Count == 0)
-        {
-            Debug.LogWarning("[Preparing] Place at least one unit before starting.");
-            return;
-        }
+        if (deployed.Count == 0) return;
 
         CancelSelection();
         isPreparing = false;
@@ -192,13 +161,8 @@ public class PreparingController : MonoBehaviour
             highlight.ClearHealPreview();
         }
 
-        if (!preSpawnEnemiesDuringPreparation)
-        {
-            if (manualEnemySetup != null && manualEnemySetup.Count > 0)
-                SpawnEnemiesFromSetup(manualEnemySetup);
-            else if (activeBattle != null)
-                SpawnEnemiesFromSetup(activeBattle.enemies);
-        }
+        if (!preSpawnEnemiesDuringPreparation && activeBattle != null)
+            SpawnEnemiesFromSetup(activeBattle.enemies);
 
         if (turnManager != null) turnManager.BeginNewBattle();
     }
@@ -242,22 +206,14 @@ public class PreparingController : MonoBehaviour
         if (instance == null || instance.definition == null) return false;
         if (!grid.Contains(cell) || grid.GetUnit(cell) != null) return false;
 
-        if (HexCoord.Distance(placementZoneCenter, cell) > placementZoneRadius)
-        {
-            if (!silent) Debug.LogWarning($"Cell {cell} is outside the placement radius.");
-            return false;
-        }
+        if (HexCoord.Distance(placementZoneCenter, cell) > placementZoneRadius) return false;
 
         int deployedCounting = 0;
         foreach (var kv in deployed)
             if (kv.Key != null && kv.Key.IsAlive && kv.Key.Definition.countsTowardUnitCap) deployedCounting++;
 
         int cap = InventoryManager.Instance != null ? InventoryManager.Instance.UnitCap : 6;
-        if (instance.definition.countsTowardUnitCap && deployedCounting >= cap)
-        {
-            if (!silent) Debug.LogWarning($"[Preparing] Unit cap reached ({cap}).");
-            return false;
-        }
+        if (instance.definition.countsTowardUnitCap && deployedCounting >= cap) return false;
 
         var unit = UnitFactory.Spawn(instance, Faction.Player, grid.CellToWorld(cell));
         if (unit == null) return false;
@@ -274,63 +230,6 @@ public class PreparingController : MonoBehaviour
         return true;
     }
 
-    // ==================================================================
-    //  ENEMY SPAWNING
-    // ==================================================================
-
-    private void SpawnEnemiesFromSetup(List<SpawnEntry> enemies)
-    {
-        if (enemies == null || enemies.Count == 0) return;
-
-        int spawnedCount = 0;
-
-        foreach (var entry in enemies)
-        {
-            if (entry == null || entry.enemy == null) continue;
-
-            if (!grid.Contains(entry.cell))
-            {
-                Debug.LogWarning($"[Preparing] Enemy '{entry.enemy.enemyName}' wanted to spawn at {entry.cell}, but that is outside the grid!");
-                continue;
-            }
-
-            if (grid.GetUnit(entry.cell) != null)
-            {
-                Debug.LogWarning($"[Preparing] Enemy '{entry.enemy.enemyName}' wanted to spawn at {entry.cell}, but it is already occupied!");
-                continue;
-            }
-
-            var def = EnemyToUnitDef(entry.enemy);
-            var unit = UnitFactory.Spawn(def, Faction.Enemy, grid.CellToWorld(entry.cell));
-
-            if (unit == null) continue;
-
-            grid.RegisterUnit(unit, entry.cell);
-            if (turnManager != null) turnManager.RegisterSpawnedUnit(unit);
-            spawnedCount++;
-        }
-
-        Debug.Log($"[Preparing] Successfully spawned {spawnedCount} / {enemies.Count} enemies.");
-    }
-
-    private UnitDefinition EnemyToUnitDef(EnemyDefinition e)
-    {
-        if (enemyDefCache.TryGetValue(e, out var c)) return c;
-        var d = ScriptableObject.CreateInstance<UnitDefinition>();
-        d.unitName = e.enemyName; d.maxHP = e.maxHP; d.defense = e.defense; d.attack = e.attack;
-        d.movementRange = e.movementRange; d.attackRange = e.attackRange;
-        d.critChance = e.critChance; d.dodgeChance = e.dodgeChance;
-        d.unitPrefab = e.unitPrefab; d.splashMode = e.splashMode; d.splashRadius = e.splashRadius;
-        d.splashValue = e.splashValue; d.ability = e.ability; d.abilityValue = e.abilityValue;
-        d.summonAtBattleStart = e.summonAtBattleStart; d.summonEveryNTurns = e.summonEveryNTurns;
-        d.killReward = e.killValue; enemyDefCache[e] = d;
-        return d;
-    }
-
-    // ==================================================================
-    //  BATTLE END & HELPERS
-    // ==================================================================
-
     private void HandleTurnStateChanged(TurnState newState)
     {
         if (!battleRunning) return;
@@ -341,6 +240,52 @@ public class PreparingController : MonoBehaviour
     private void HandleVictory()
     {
         battleRunning = false;
+
+        int enemyKills = EconomyManager.Instance.LastBattleKillGold;
+        int abilityGains = EconomyManager.Instance.LastBattleAbilityGold;
+
+        // ★ FIXED: Calculate current money safely by reversing the math
+        int current = Mathf.Max(0, EconomyManager.Instance.Money - enemyKills - abilityGains);
+
+        // ★ FIXED: Preview Upkeep for both Bench and Battlefield
+        int upk = CalculateTotalUpkeep();
+
+        if (victoryScreen != null)
+        {
+            victoryScreen.OnNextClicked += FinishBattleCleanup;
+            victoryScreen.Show(current, enemyKills, abilityGains, upk);
+        }
+        else
+        {
+            FinishBattleCleanup();
+        }
+    }
+
+    private int CalculateTotalUpkeep()
+    {
+        int total = 0;
+
+        // 1. Units on the bench
+        if (InventoryManager.Instance != null)
+        {
+            foreach (var inst in InventoryManager.Instance.Units)
+                if (inst.definition != null) total += inst.definition.upkeepCost;
+        }
+
+        // 2. Units currently on the board
+        foreach (var kvp in deployed)
+        {
+            if (kvp.Key != null && kvp.Key.IsAlive && kvp.Key.Definition != null)
+                total += kvp.Key.Definition.upkeepCost;
+        }
+
+        return total;
+    }
+
+    private void FinishBattleCleanup()
+    {
+        if (victoryScreen != null) victoryScreen.OnNextClicked -= FinishBattleCleanup;
+
         foreach (var unit in grid.GetAllLivingUnits(Faction.Player))
         {
             if (unit == null || unit.IsTransient || !deployed.ContainsKey(unit)) continue;
@@ -378,6 +323,37 @@ public class PreparingController : MonoBehaviour
         OnFightComplete?.Invoke(MapNodeResult.Fail);
     }
 
+    private void SpawnEnemiesFromSetup(List<SpawnEntry> enemies)
+    {
+        if (enemies == null) return;
+        foreach (var entry in enemies)
+        {
+            if (entry == null || entry.enemy == null) continue;
+            if (!grid.Contains(entry.cell) || grid.GetUnit(entry.cell) != null) continue;
+
+            var def = EnemyToUnitDef(entry.enemy);
+            var unit = UnitFactory.Spawn(def, Faction.Enemy, grid.CellToWorld(entry.cell));
+            if (unit == null) continue;
+
+            grid.RegisterUnit(unit, entry.cell);
+            if (turnManager != null) turnManager.RegisterSpawnedUnit(unit);
+        }
+    }
+
+    private UnitDefinition EnemyToUnitDef(EnemyDefinition e)
+    {
+        if (enemyDefCache.TryGetValue(e, out var c)) return c;
+        var d = ScriptableObject.CreateInstance<UnitDefinition>();
+        d.unitName = e.enemyName; d.maxHP = e.maxHP; d.defense = e.defense; d.attack = e.attack;
+        d.movementRange = e.movementRange; d.attackRange = e.attackRange;
+        d.critChance = e.critChance; d.dodgeChance = e.dodgeChance;
+        d.unitPrefab = e.unitPrefab; d.splashMode = e.splashMode; d.splashRadius = e.splashRadius;
+        d.splashValue = e.splashValue; d.ability = e.ability; d.abilityValue = e.abilityValue;
+        d.summonAtBattleStart = e.summonAtBattleStart; d.summonEveryNTurns = e.summonEveryNTurns;
+        d.killReward = e.killValue; enemyDefCache[e] = d;
+        return d;
+    }
+
     private void FireCanStartChanged() => OnCanStartBattleChanged?.Invoke(CanStartBattle);
 
     private bool TryGetCellUnderMouse(out HexCoord cell)
@@ -390,4 +366,4 @@ public class PreparingController : MonoBehaviour
         cell = grid.WorldToCell(ray.GetPoint(enter));
         return grid.Contains(cell);
     }
-}   
+}

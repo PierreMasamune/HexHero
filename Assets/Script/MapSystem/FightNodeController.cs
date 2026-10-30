@@ -6,7 +6,12 @@ public class FightNodeController : MonoBehaviour, IMapNodeController
     [Header("References")]
     [SerializeField] private TurnManager turnManager;
     [SerializeField] private PreparingController preparingController;
-    [SerializeField] private GameObject battleCanvasRoot;
+
+    [Tooltip("The 3D World (HexGrid, etc.)")]
+    [SerializeField] private GameObject battleWorldRoot;
+
+    [Tooltip("The Canvas with the End Turn button and Turn text.")]
+    [SerializeField] private GameObject battleHUD; // ★ NEW
 
     [Header("Data")]
     [SerializeField] private FightCatalog fightCatalog;
@@ -18,9 +23,12 @@ public class FightNodeController : MonoBehaviour, IMapNodeController
     public void Enter(MapNodeData node, RunState state)
     {
         CurrentNodeId = node.id;
-        if (battleCanvasRoot != null) battleCanvasRoot.SetActive(true);
 
-        // ★ NEW: Use the node's specific tier instead of the player's depth
+        // ★ Force the 3D world and Battle Canvas ON
+        if (battleWorldRoot != null) battleWorldRoot.SetActive(true);
+        if (battleHUD != null) battleHUD.SetActive(true);
+
+        // 1. Pick a random battle based on the node's specific tier
         FightDefinition chosenFight = fightCatalog.GetRandomFight(node.tier);
 
         if (chosenFight == null)
@@ -30,11 +38,13 @@ public class FightNodeController : MonoBehaviour, IMapNodeController
             return;
         }
 
+        // 2. Apply the terrain for this battle
         if (terrainMap != null)
         {
             terrainMap.ApplyTerrainLayout(chosenFight.terrain);
         }
 
+        // 3. Tell PreparingController to load this battle
         if (preparingController != null)
         {
             preparingController.OnFightComplete += HandleFightComplete;
@@ -52,7 +62,7 @@ public class FightNodeController : MonoBehaviour, IMapNodeController
 
     public void RaiseComplete(MapNodeResult result)
     {
-        if (battleCanvasRoot != null) battleCanvasRoot.SetActive(false);
+        if (battleHUD != null) battleHUD.SetActive(false); // Hide HUD when leaving fight
         OnComplete?.Invoke(this, result);
     }
 }
