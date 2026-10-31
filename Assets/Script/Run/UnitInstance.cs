@@ -6,7 +6,9 @@ public class UnitInstance
 {
     public UnitDefinition definition;
 
-    // These are public, so you can edit them directly in the Inspector!
+    // ★ NEW: Stores the asset name so we can save/load it as a string
+    public string definitionName;
+
     public int currentHP;
     public int maxHP;
 
@@ -16,17 +18,16 @@ public class UnitInstance
     public UnitInstance(UnitDefinition def)
     {
         definition = def;
+        if (def != null) definitionName = def.name; // Save the name!
         SyncWithDefinition();
     }
 
-    /// <summary>
-    /// Pulls the max HP from the definition and heals the unit to full.
-    /// </summary>
     [ContextMenu("Sync HP with Definition")]
     public void SyncWithDefinition()
     {
         if (definition != null)
         {
+            definitionName = definition.name;
             maxHP = definition.maxHP;
             currentHP = maxHP;
         }

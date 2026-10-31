@@ -7,19 +7,25 @@ public class InventoryManager : MonoBehaviour
     public static InventoryManager Instance { get; private set; }
 
     [Header("Config")]
+    [Tooltip("Maximum units allowed on the battlefield at once.")]
     [SerializeField] private int baseUnitCap = 6;
 
-    // ★ Visible in the Inspector so you can edit HP manually
-    [Header("Troops (Editable for Testing)")]
-    [SerializeField] private List<UnitInstance> units = new();
-    public IReadOnlyList<UnitInstance> Units => units;
+    [Header("Debug Army (For Testing)")]
+    [SerializeField] private List<UnitDefinition> debugStartingArmy = new();
+
+    public IReadOnlyList<UnitInstance> Units
+    {
+        get
+        {
+            if (RunManager.Instance != null && RunManager.Instance.State != null)
+                return RunManager.Instance.State.units;
+
+            return new List<UnitInstance>();
+        }
+    }
 
     [System.Serializable]
-    public class ItemEntry
-    {
-        public string itemId;
-        public int count;
-    }
+    public class ItemEntry { public string itemId; public int count; }
 
     [Header("Items (For Testing)")]
     [SerializeField] private List<ItemEntry> startWithItems = new();
@@ -27,22 +33,32 @@ public class InventoryManager : MonoBehaviour
     private readonly Dictionary<string, int> items = new();
     public IReadOnlyDictionary<string, int> Items => items;
 
-    private int permanentCapBonus;
-    public int UnitCap => baseUnitCap + permanentCapBonus;
+    public int UnitCap => baseUnitCap + (RunManager.Instance != null ? RunManager.Instance.State.unitCapBonus : 0);
 
     public event Action OnUnitsChanged;
     public event Action OnItemsChanged;
-    public event Action<int> OnUnitCapChanged;
 
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+    }
 
+    private void Start()
+    {
         foreach (var entry in startWithItems)
         {
             if (!string.IsNullOrEmpty(entry.itemId) && entry.count > 0)
                 AddItem(entry.itemId, entry.count);
+        }
+
+        // Populate debug army if it's a brand new run
+        if (RunManager.Instance != null && RunManager.Instance.State.visitedMapNodeIds.Count == 0)
+        {
+            foreach (var unitDef in debugStartingArmy)
+            {
+                if (unitDef != null) TryAddUnit(unitDef, out _);
+            }
         }
     }
 
@@ -54,10 +70,14 @@ public class InventoryManager : MonoBehaviour
     {
         added = null;
         if (def == null) return false;
-        if (units.Count >= UnitCap && !def.isKing) return false;
 
-        added = new UnitInstance(def); // Constructor automatically sets maxHP & currentHP
-        units.Add(added);
+        var list = RunManager.Instance.State.units;
+
+        // ★ REMOVED CAP CHECK: You can now hold infinite units in inventory!
+
+        added = new UnitInstance(def);
+        list.Add(added);
+
         OnUnitsChanged?.Invoke();
         return true;
     }
@@ -65,56 +85,42 @@ public class InventoryManager : MonoBehaviour
     public void RemoveUnit(UnitInstance instance)
     {
         if (instance == null) return;
-        if (units.Remove(instance)) OnUnitsChanged?.Invoke();
+        if (RunManager.Instance.State.units.Remove(instance))
+            OnUnitsChanged?.Invoke();
     }
 
     public bool ReturnUnit(UnitInstance instance)
     {
         if (instance == null || instance.definition == null) return false;
-        if (units.Contains(instance)) return true;
 
-        if (!instance.definition.isKing && units.Count >= UnitCap)
-        {
-            Debug.LogWarning($"[Inventory] Cannot return {instance.definition.unitName}: cap ({UnitCap}) reached.");
-            return false;
-        }
+        var list = RunManager.Instance.State.units;
+        if (list.Contains(instance)) return true;
 
-        units.Add(instance);
+        // ★ REMOVED CAP CHECK: Survivors always return safely.
+
+        list.Add(instance);
         OnUnitsChanged?.Invoke();
         return true;
-    }
-
-    // ★ NEW: Right-click the InventoryManager component header and select this to fix all HP values
-    [ContextMenu("Sync All HP to Definitions")]
-    public void SyncAllHP()
-    {
-        foreach (var unit in units)
-        {
-            if (unit != null) unit.SyncWithDefinition();
-        }
-        OnUnitsChanged?.Invoke();
-        Debug.Log("[Inventory] Synced all unit HP to their definitions.");
     }
 
     public int TotalUpkeep()
     {
         int sum = 0;
-        foreach (var u in units)
+        foreach (var u in Units)
             if (u.definition != null) sum += u.definition.upkeepCost;
         return sum;
     }
 
     public UnitInstance GetKing()
     {
-        foreach (var u in units) if (u.IsKing) return u;
+        foreach (var u in Units) if (u.IsKing) return u;
         return null;
     }
 
     public void AddUnitCap(int delta)
     {
-        if (delta == 0) return;
-        permanentCapBonus = Mathf.Max(0, permanentCapBonus + delta);
-        OnUnitCapChanged?.Invoke(UnitCap);
+        if (delta == 0 || RunManager.Instance == null) return;
+        RunManager.Instance.State.unitCapBonus = Mathf.Max(0, RunManager.Instance.State.unitCapBonus + delta);
     }
 
     // ============================================================
@@ -145,19 +151,13 @@ public class InventoryManager : MonoBehaviour
         return items.TryGetValue(itemId, out int c) ? c : 0;
     }
 
-    public void RestoreFromRunState(List<UnitInstance> savedUnits, Dictionary<string, int> savedItems, int savedCapBonus)
+    [ContextMenu("Sync All HP to Definitions")]
+    public void SyncAllHP()
     {
-        units.Clear();
-        if (savedUnits != null) units.AddRange(savedUnits);
-
-        items.Clear();
-        if (savedItems != null)
-            foreach (var kv in savedItems) items[kv.Key] = kv.Value;
-
-        permanentCapBonus = Mathf.Max(0, savedCapBonus);
-
+        foreach (var unit in Units)
+        {
+            if (unit != null) unit.SyncWithDefinition();
+        }
         OnUnitsChanged?.Invoke();
-        OnItemsChanged?.Invoke();
-        OnUnitCapChanged?.Invoke(UnitCap);
     }
 }

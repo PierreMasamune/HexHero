@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using TMPro;
 
 public class PreparingController : MonoBehaviour
 {
@@ -12,6 +14,9 @@ public class PreparingController : MonoBehaviour
     [SerializeField] private HexHighlightManager highlight;
     [SerializeField] private Camera cam;
     [SerializeField] private VictoryScreenUI victoryScreen;
+
+    [Tooltip("UI Text element to show error messages like 'Need to put King!'")]
+    [SerializeField] private TMP_Text warningText;
 
     [Header("Preparing UI")]
     [SerializeField] private GameObject preparingRoot;
@@ -33,7 +38,8 @@ public class PreparingController : MonoBehaviour
 
     public event Action<MapNodeResult> OnFightComplete;
     public event Action<bool> OnCanStartBattleChanged;
-    public bool CanStartBattle => deployed.Count > 0;
+
+    public bool CanStartBattle => IsKingDeployed();
 
     private readonly Dictionary<Unit, UnitInstance> deployed = new();
     private readonly Dictionary<EnemyDefinition, UnitDefinition> enemyDefCache = new();
@@ -41,6 +47,7 @@ public class PreparingController : MonoBehaviour
     private HashSet<HexCoord> validPlacementCells;
     private bool isPreparing;
     private bool battleRunning;
+    private Coroutine warningCoroutine;
 
     private FightDefinition activeBattle;
 
@@ -55,6 +62,7 @@ public class PreparingController : MonoBehaviour
         if (turnManager != null) turnManager.OnStateChanged += HandleTurnStateChanged;
         if (preparingRoot != null) preparingRoot.SetActive(false);
         if (victoryScreen != null) victoryScreen.gameObject.SetActive(false);
+        if (warningText != null) warningText.gameObject.SetActive(false);
     }
 
     private void OnDestroy()
@@ -90,6 +98,12 @@ public class PreparingController : MonoBehaviour
 
         if (preparingRoot != null) preparingRoot.SetActive(true);
         if (selector != null) selector.EnableInput(false);
+
+        // ★ FIX: Completely reset the TurnManager state so it's ready for a new battle
+        if (turnManager != null)
+        {
+            turnManager.ResetForNewBattle();
+        }
 
         if (autoPlaceKing) TryAutoPlaceKing();
 
@@ -146,8 +160,19 @@ public class PreparingController : MonoBehaviour
 
     public void StartBattleClicked()
     {
+        if (!IsKingDeployed())
+        {
+            StartCoroutine(ShowWarning("Need to put King!"));
+            return;
+        }
+
         if (deployed.Count == 0) return;
 
+        StartCoroutine(StartBattleRoutine());
+    }
+
+    private IEnumerator StartBattleRoutine()
+    {
         CancelSelection();
         isPreparing = false;
         battleRunning = true;
@@ -164,7 +189,14 @@ public class PreparingController : MonoBehaviour
         if (!preSpawnEnemiesDuringPreparation && activeBattle != null)
             SpawnEnemiesFromSetup(activeBattle.enemies);
 
-        if (turnManager != null) turnManager.BeginNewBattle();
+        // ★ Wait 1 frame for all the enemies to properly register in the Grid
+        yield return new WaitForEndOfFrame();
+
+        if (turnManager != null)
+        {
+            turnManager.SyncUnitListsWithGrid();
+            turnManager.BeginNewBattle();
+        }
     }
 
     public void ResetPlacementClicked()
@@ -213,7 +245,12 @@ public class PreparingController : MonoBehaviour
             if (kv.Key != null && kv.Key.IsAlive && kv.Key.Definition.countsTowardUnitCap) deployedCounting++;
 
         int cap = InventoryManager.Instance != null ? InventoryManager.Instance.UnitCap : 6;
-        if (instance.definition.countsTowardUnitCap && deployedCounting >= cap) return false;
+
+        if (instance.definition.countsTowardUnitCap && deployedCounting >= cap)
+        {
+            if (!silent) StartCoroutine(ShowWarning($"Max unit cap reached! ({cap})"));
+            return false;
+        }
 
         var unit = UnitFactory.Spawn(instance, Faction.Player, grid.CellToWorld(cell));
         if (unit == null) return false;
@@ -230,6 +267,30 @@ public class PreparingController : MonoBehaviour
         return true;
     }
 
+    private bool IsKingDeployed()
+    {
+        foreach (var kv in deployed)
+        {
+            if (kv.Key != null && kv.Key.IsKing && kv.Key.IsAlive) return true;
+        }
+        return false;
+    }
+
+    private IEnumerator ShowWarning(string message)
+    {
+        if (warningText == null) yield break;
+
+        if (warningCoroutine != null) StopCoroutine(warningCoroutine);
+
+        warningText.text = message;
+        warningText.gameObject.SetActive(true);
+
+        yield return new WaitForSeconds(2f);
+
+        warningText.gameObject.SetActive(false);
+        warningCoroutine = null;
+    }
+
     private void HandleTurnStateChanged(TurnState newState)
     {
         if (!battleRunning) return;
@@ -243,11 +304,7 @@ public class PreparingController : MonoBehaviour
 
         int enemyKills = EconomyManager.Instance.LastBattleKillGold;
         int abilityGains = EconomyManager.Instance.LastBattleAbilityGold;
-
-        // ★ FIXED: Calculate current money safely by reversing the math
         int current = Mathf.Max(0, EconomyManager.Instance.Money - enemyKills - abilityGains);
-
-        // ★ FIXED: Preview Upkeep for both Bench and Battlefield
         int upk = CalculateTotalUpkeep();
 
         if (victoryScreen != null)
@@ -264,21 +321,17 @@ public class PreparingController : MonoBehaviour
     private int CalculateTotalUpkeep()
     {
         int total = 0;
-
-        // 1. Units on the bench
         if (InventoryManager.Instance != null)
         {
             foreach (var inst in InventoryManager.Instance.Units)
                 if (inst.definition != null) total += inst.definition.upkeepCost;
         }
 
-        // 2. Units currently on the board
         foreach (var kvp in deployed)
         {
             if (kvp.Key != null && kvp.Key.IsAlive && kvp.Key.Definition != null)
                 total += kvp.Key.Definition.upkeepCost;
         }
-
         return total;
     }
 
@@ -290,8 +343,12 @@ public class PreparingController : MonoBehaviour
         {
             if (unit == null || unit.IsTransient || !deployed.ContainsKey(unit)) continue;
             var instance = deployed[unit];
+
             unit.WriteBackTo(instance);
-            if (instance.IsAlive && InventoryManager.Instance != null) InventoryManager.Instance.ReturnUnit(instance);
+
+            if (instance.IsAlive && InventoryManager.Instance != null)
+                InventoryManager.Instance.ReturnUnit(instance);
+
             grid.ClearUnit(unit.Cell);
             Destroy(unit.gameObject);
         }

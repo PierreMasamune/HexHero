@@ -6,7 +6,6 @@ using UnityEngine;
 public class RunState
 {
     [Serializable] public class ItemStack { public string itemId; public int count; }
-    [Serializable] public class NodeProgress { public string nodeId; public bool visited; }
 
     [Header("Meta")]
     public int seed;
@@ -14,7 +13,7 @@ public class RunState
     public int turnNumber = 1;
 
     [Header("Money")]
-    public int money;
+    public int money = 100;
 
     [Header("Units")]
     public List<UnitInstance> units = new();

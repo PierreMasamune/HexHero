@@ -1,0 +1,46 @@
+{
+    "version": 1,
+    "name": "CameraInputSystem",
+    "maps": [
+        {
+            "name": "New action map",
+            "id": "70d2906e-2cd7-48cf-aa61-d85bf121a5ff",
+            "actions": [
+                {
+                    "name": "New action",
+                    "type": "Value",
+                    "id": "3e461663-d065-445a-ae63-b18d1181d935",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "d9712738-5b11-4633-88c8-970666c9af93",
+                    "path": "<Mouse>/scroll",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "New action",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "99c36a75-32d9-4379-bf6a-c4218175910b",
+                    "path": "<Mouse>/position",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "New action",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}

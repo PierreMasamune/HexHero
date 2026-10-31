@@ -107,9 +107,30 @@ public class TurnManager : MonoBehaviour
         }
     }
 
+    // ★ NEW: Resets everything before starting a new battle
+    public void ResetForNewBattle()
+    {
+        StopAllCoroutines(); // Kill any lingering loops from the previous fight
+        gameLoopRunning = false;
+        nextTurnRequested = false;
+        popupOpen = false;
+
+        playerUnits.Clear();
+        enemyUnits.Clear();
+
+        TurnNumber = 1;
+        SetState(TurnState.Preparing);
+        SetNextTurnButtonInteractable(false);
+        if (selector != null) selector.EnableInput(false);
+    }
+
     public void BeginNewBattle()
     {
         if (gameLoopRunning) return;
+
+        // ★ Force the lists to match the grid before starting
+        SyncUnitListsWithGrid();
+
         StartCoroutine(GameLoop());
     }
 
@@ -195,6 +216,7 @@ public class TurnManager : MonoBehaviour
             SetNextTurnButtonInteractable(false);
             selector?.EnableInput(false);
 
+            if (!gameLoopRunning) yield break;
             if (CheckBattleEnd()) { gameLoopRunning = false; yield break; }
 
             SyncUnitListsWithGrid();
@@ -204,6 +226,8 @@ public class TurnManager : MonoBehaviour
             SetState(TurnState.EnemyTurn);
 
             yield return StartCoroutine(EnemyTurnRoutine());
+
+            if (!gameLoopRunning) yield break;
             if (CheckBattleEnd()) { gameLoopRunning = false; yield break; }
 
             SetTurnNumber(TurnNumber + 1);
@@ -316,20 +340,14 @@ public class TurnManager : MonoBehaviour
     {
         SetNextTurnButtonInteractable(false);
         if (stopPlayerInputOnGameEnd && selector != null) selector.EnableInput(false);
-
-        // ★ Start a routine to clean up minions FIRST, then set the Victory state
         StartCoroutine(EndGameRoutine(endState));
     }
 
     private IEnumerator EndGameRoutine(TurnState endState)
     {
-        // 1. Cleanup the minions and wait for them to vanish
         yield return StartCoroutine(CleanupTransientUnitsRoutine());
-
-        // 2. Now set the state (This triggers the Victory UI in PreparingController)
         SetState(endState);
 
-        // 3. Fire the UnityEvents
         if (endState == TurnState.Victory)
         {
             if (EconomyManager.Instance != null)
@@ -438,4 +456,4 @@ public class TurnManager : MonoBehaviour
         }
         OnUnitCountChanged?.Invoke(canAct, alive);
     }
-}
+}   
